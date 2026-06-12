@@ -1,3 +1,4 @@
+// CartModal.jsx - Modal para mostrar el contenido del carrito, permitir modificar cantidades, eliminar productos y proceder al pago
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useCart } from '../../contexts/CartContext'
