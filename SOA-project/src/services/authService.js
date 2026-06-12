@@ -9,7 +9,8 @@ let mockUsers = [
     rol: 'ADMIN',
     activo: true,
     fechaRegistro: '2024-01-01T00:00:00',
-    direccion: null
+    direccion: null,
+    needPasswordChange: false
   },
   {
     id: 2,
@@ -25,7 +26,8 @@ let mockUsers = [
       distrito: 'Miraflores',
       linea: 'Av. Larco 123',
       referencia: 'Frente al parque'
-    }
+    },
+    needPasswordChange: false
   },
   {
     id: 3,
@@ -35,7 +37,8 @@ let mockUsers = [
     rol: 'VENDEDOR',
     activo: true,
     fechaRegistro: '2024-02-01T00:00:00',
-    direccion: null
+    direccion: null,
+    needPasswordChange: true  // Vendedor necesita cambiar contraseña
   },
   {
     id: 4,
@@ -45,9 +48,13 @@ let mockUsers = [
     rol: 'COMPRADOR',
     activo: true,
     fechaRegistro: '2024-02-10T00:00:00',
-    direccion: null
+    direccion: null,
+    needPasswordChange: false
   },
 ]
+
+// Almacenamiento temporal para códigos de recuperación
+const resetCodes = new Map()
 
 export const authService = {
   async login(credentials) {
@@ -60,13 +67,83 @@ export const authService = {
         if (user) {
           const { password, ...userWithoutPassword } = user
           const token = btoa(JSON.stringify({ id: user.id, email: user.email, rol: user.rol }))
-          resolve({
-            success: true,
-            token,
-            user: userWithoutPassword,
-          })
+          
+          // Verificar si necesita cambiar contraseña
+          if (user.needPasswordChange) {
+            resolve({
+              success: true,
+              needPasswordChange: true,
+              user: userWithoutPassword,
+              token
+            })
+          } else {
+            resolve({
+              success: true,
+              token,
+              user: userWithoutPassword,
+            })
+          }
         } else {
           resolve({ success: false, error: 'Credenciales inválidas o usuario inactivo' })
+        }
+      }, 500)
+    })
+  },
+
+  async updatePassword(email, userId, newPassword) {
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        const index = mockUsers.findIndex(u => u.email === email || u.id === userId)
+        if (index !== -1) {
+          mockUsers[index].password = newPassword
+          mockUsers[index].needPasswordChange = false
+          resolve({ success: true })
+        } else {
+          resolve({ success: false, error: 'Usuario no encontrado' })
+        }
+      }, 500)
+    })
+  },
+
+  async requestPasswordReset(email) {
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        const user = mockUsers.find(u => u.email === email)
+        if (user) {
+          const code = Math.floor(100000 + Math.random() * 900000).toString()
+          resetCodes.set(email, { code, expires: Date.now() + 600000 }) // 10 minutos
+          console.log(`Código de recuperación para ${email}: ${code}`)
+          resolve({ success: true, code })
+        } else {
+          resolve({ success: false, error: 'Correo no registrado' })
+        }
+      }, 500)
+    })
+  },
+
+  async verifyResetCode(email, code) {
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        const resetData = resetCodes.get(email)
+        if (resetData && resetData.code === code && resetData.expires > Date.now()) {
+          resolve({ success: true })
+        } else {
+          resolve({ success: false, error: 'Código inválido o expirado' })
+        }
+      }, 300)
+    })
+  },
+
+  async resetPassword(email, newPassword) {
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        const index = mockUsers.findIndex(u => u.email === email)
+        if (index !== -1) {
+          mockUsers[index].password = newPassword
+          resetCodes.delete(email)
+          resolve({ success: true })
+        } else {
+          resolve({ success: false, error: 'Usuario no encontrado' })
         }
       }, 500)
     })
@@ -82,7 +159,8 @@ export const authService = {
           rol: 'COMPRADOR',
           activo: true,
           fechaRegistro: new Date().toISOString(),
-          direccion: null
+          direccion: null,
+          needPasswordChange: false
         }
         const token = btoa(JSON.stringify(mockUser))
         resolve({
@@ -109,7 +187,8 @@ export const authService = {
             rol: userData.rol,
             activo: true,
             fechaRegistro: new Date().toISOString(),
-            direccion: userData.direccion || null
+            direccion: userData.direccion || null,
+            needPasswordChange: false
           }
           mockUsers.push(newUser)
           resolve({ success: true })

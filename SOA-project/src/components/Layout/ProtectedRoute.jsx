@@ -1,3 +1,4 @@
+// ProtectedRoute.jsx - Componente para proteger rutas según el rol del usuario, redirigiendo a login si no está autenticado o no tiene el rol adecuado
 import React from 'react'
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
