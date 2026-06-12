@@ -1,4 +1,3 @@
-// src/App.jsx
 import React from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import Navbar from './components/Layout/Navbar'
@@ -9,6 +8,8 @@ import ProductDetailPage from './pages/ProductDetailPage'
 import CheckoutPage from './pages/CheckoutPage'
 import OrdersPage from './pages/OrdersPage'
 import AdminPage from './pages/AdminPage'
+import ProfilePage from './pages/ProfilePage'
+import VendorPanel from './pages/VendorPanel'
 import Login from './components/Auth/Login'
 import Register from './components/Auth/Register'
 import { Toaster } from 'react-hot-toast'
@@ -24,13 +25,23 @@ function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/products" element={<ProductsPage />} />
           <Route path="/products/:id" element={<ProductDetailPage />} />
+          <Route path="/profile" element={
+            <ProtectedRoute allowedRoles={['COMPRADOR', 'VENDEDOR', 'ADMIN']}>
+              <ProfilePage />
+            </ProtectedRoute>
+          } />
+          <Route path="/vendor" element={
+            <ProtectedRoute allowedRoles={['VENDEDOR']}>
+              <VendorPanel />
+            </ProtectedRoute>
+          } />
           <Route path="/checkout" element={
-            <ProtectedRoute allowedRoles={['USER', 'ADMIN']}>
+            <ProtectedRoute allowedRoles={['COMPRADOR', 'ADMIN']}>
               <CheckoutPage />
             </ProtectedRoute>
           } />
           <Route path="/orders" element={
-            <ProtectedRoute allowedRoles={['USER', 'ADMIN']}>
+            <ProtectedRoute allowedRoles={['COMPRADOR', 'ADMIN']}>
               <OrdersPage />
             </ProtectedRoute>
           } />
