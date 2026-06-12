@@ -1,4 +1,3 @@
-//src\contexts\AuthContext.jsx
 import React, { createContext, useState, useContext, useEffect } from 'react'
 import { authService } from '../services/authService'
 
@@ -24,13 +23,21 @@ export const AuthProvider = ({ children }) => {
     if (storedToken && storedUser) {
       setToken(storedToken)
       setUser(JSON.parse(storedUser))
+    } else {
+      // Usuario invitado
+      setUser({
+        id: 0,
+        nombre: 'Invitado',
+        email: 'invitado@byteverse.com',
+        rol: 'INVITADO',
+        activo: true
+      })
     }
     setLoading(false)
   }, [])
 
   const login = async (email, password) => {
     try {
-      // Simulación de login con Google OAuth2
       const response = await authService.login({ email, password })
       
       if (response.success) {
@@ -38,6 +45,13 @@ export const AuthProvider = ({ children }) => {
         setToken(response.token)
         localStorage.setItem('jwt', response.token)
         localStorage.setItem('user', JSON.stringify(response.user))
+        
+        // Verificar si hay redirección pendiente
+        const redirectTo = sessionStorage.getItem('redirectAfterLogin')
+        if (redirectTo) {
+          sessionStorage.removeItem('redirectAfterLogin')
+          return { success: true, redirectTo }
+        }
         return { success: true }
       }
       return { success: false, error: 'Credenciales inválidas' }
@@ -76,8 +90,25 @@ export const AuthProvider = ({ children }) => {
     }
   }
 
+  const updateUser = async (userData) => {
+    try {
+      const updatedUser = { ...user, ...userData }
+      setUser(updatedUser)
+      localStorage.setItem('user', JSON.stringify(updatedUser))
+      return { success: true }
+    } catch (error) {
+      return { success: false, error: error.message }
+    }
+  }
+
   const logout = () => {
-    setUser(null)
+    setUser({
+      id: 0,
+      nombre: 'Invitado',
+      email: 'invitado@byteverse.com',
+      rol: 'INVITADO',
+      activo: true
+    })
     setToken(null)
     localStorage.removeItem('jwt')
     localStorage.removeItem('user')
@@ -92,9 +123,12 @@ export const AuthProvider = ({ children }) => {
     loginWithGoogle,
     register,
     logout,
-    isAuthenticated: !!user,
+    updateUser,
+    isAuthenticated: user?.rol !== 'INVITADO' && !!user?.id,
     isAdmin: user?.rol === 'ADMIN',
-    isUser: user?.rol === 'USER',
+    isVendedor: user?.rol === 'VENDEDOR',
+    isComprador: user?.rol === 'COMPRADOR',
+    isInvitado: user?.rol === 'INVITADO',
   }
 
   return (
