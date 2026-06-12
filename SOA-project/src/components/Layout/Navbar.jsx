@@ -1,13 +1,12 @@
-//src\components\Layout\Navbar.jsx
 import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { useCart } from '../../contexts/CartContext'
-import { ShoppingCart, User, LogOut, Shield, Package, Home, Grid, Zap, Menu, X } from 'lucide-react'
+import { ShoppingCart, User, LogOut, Shield, Package, Home, Grid, Zap, Menu, X, Store } from 'lucide-react'
 import CartModal from '../Cart/CartModal'
 
 const Navbar = () => {
-  const { user, logout, isAuthenticated, isAdmin } = useAuth()
+  const { user, logout, isAuthenticated, isAdmin, isVendedor, isInvitado } = useAuth()
   const { getCartCount } = useCart()
   const navigate = useNavigate()
   const [isCartOpen, setIsCartOpen] = useState(false)
@@ -19,18 +18,23 @@ const Navbar = () => {
   }
 
   const navLinks = [
-    { to: '/', label: 'Inicio', icon: <Home size={18} /> },
-    { to: '/products', label: 'Productos', icon: <Grid size={18} /> },
-    ...(isAuthenticated ? [{ to: '/orders', label: 'Mis Pedidos', icon: <Package size={18} /> }] : []),
-    ...(isAdmin ? [{ to: '/admin', label: 'Admin', icon: <Shield size={18} /> }] : []),
+    { to: '/', label: 'Inicio', icon: <Home size={18} />, roles: ['COMPRADOR', 'VENDEDOR', 'ADMIN', 'INVITADO'] },
+    { to: '/products', label: 'Productos', icon: <Grid size={18} />, roles: ['COMPRADOR', 'VENDEDOR', 'ADMIN', 'INVITADO'] },
+    { to: '/profile', label: 'Mi Perfil', icon: <User size={18} />, roles: ['COMPRADOR', 'VENDEDOR', 'ADMIN'] },
+    { to: '/orders', label: 'Mis Pedidos', icon: <Package size={18} />, roles: ['COMPRADOR', 'ADMIN'] },
+    { to: '/vendor', label: 'Mi Tienda', icon: <Store size={18} />, roles: ['VENDEDOR'] },
+    { to: '/admin', label: 'Admin', icon: <Shield size={18} />, roles: ['ADMIN'] },
   ]
+
+  const filteredLinks = navLinks.filter(link => 
+    link.roles.includes(user?.rol) || (link.roles.includes('INVITADO') && isInvitado)
+  )
 
   return (
     <>
       <nav className="fixed top-0 left-0 right-0 z-50 bg-black/50 backdrop-blur-xl border-b border-cyan-500/30">
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
-            {/* Logo */}
             <Link to="/" className="flex items-center space-x-2 group">
               <Zap className="w-6 h-6 text-cyan-400 group-hover:text-purple-400 transition-colors animate-pulse-glow" />
               <span className="text-2xl font-bold bg-gradient-to-r from-cyan-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent bg-300% animate-gradient">
@@ -41,9 +45,8 @@ const Navbar = () => {
               </span>
             </Link>
 
-            {/* Desktop Navigation */}
             <div className="hidden md:flex items-center space-x-1">
-              {navLinks.map((link) => (
+              {filteredLinks.map((link) => (
                 <Link
                   key={link.to}
                   to={link.to}
@@ -55,9 +58,7 @@ const Navbar = () => {
               ))}
             </div>
 
-            {/* Right Section */}
             <div className="flex items-center space-x-4">
-              {/* Cart Button */}
               <button
                 onClick={() => setIsCartOpen(true)}
                 className="relative p-2 rounded-lg hover:bg-cyan-500/10 transition-all group"
@@ -70,7 +71,6 @@ const Navbar = () => {
                 )}
               </button>
 
-              {/* User Menu */}
               {isAuthenticated ? (
                 <div className="hidden md:flex items-center space-x-3">
                   <div className="text-right">
@@ -94,7 +94,6 @@ const Navbar = () => {
                 </Link>
               )}
 
-              {/* Mobile menu button */}
               <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
                 className="md:hidden p-2 rounded-lg hover:bg-cyan-500/10"
@@ -104,10 +103,9 @@ const Navbar = () => {
             </div>
           </div>
 
-          {/* Mobile Navigation */}
           {isMobileMenuOpen && (
             <div className="md:hidden mt-4 pt-4 border-t border-cyan-500/30 space-y-2 animate-gradient">
-              {navLinks.map((link) => (
+              {filteredLinks.map((link) => (
                 <Link
                   key={link.to}
                   to={link.to}
@@ -144,10 +142,7 @@ const Navbar = () => {
         </div>
       </nav>
 
-      {/* Cart Modal */}
       <CartModal isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
-
-      {/* Spacer para contenido fijo */}
       <div className="h-16"></div>
     </>
   )
