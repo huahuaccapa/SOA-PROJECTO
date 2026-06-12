@@ -1,3 +1,4 @@
+// AdminUsers.jsx - Componente para gestionar usuarios en el panel de administración
 import React, { useState, useEffect } from 'react'
 import { userService } from '../../services/userService'
 import { useNotification } from '../../contexts/NotificationContext'
