@@ -1,3 +1,4 @@
+// VendorPanel.jsx - Panel de vendedor para gestionar productos, ver solicitudes y crear nuevos productos
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { productService } from '../services/productService'
