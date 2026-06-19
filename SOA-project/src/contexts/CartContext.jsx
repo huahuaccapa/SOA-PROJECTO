@@ -1,6 +1,6 @@
-//src\contexts\CartContext.jsx
 import React, { createContext, useState, useContext, useEffect } from 'react'
 import { cartService } from '../services/cartService'
+import { useAuth } from './AuthContext'
 
 const CartContext = createContext()
 
@@ -13,19 +13,37 @@ export const useCart = () => {
 }
 
 export const CartProvider = ({ children }) => {
+  const { user } = useAuth()
   const [cart, setCart] = useState([])
   const [loading, setLoading] = useState(false)
 
+  // Cargar carrito al iniciar o cuando cambie el usuario
   useEffect(() => {
-    const savedCart = localStorage.getItem('cart')
-    if (savedCart) {
-      setCart(JSON.parse(savedCart))
-    }
-  }, [])
+    loadCart()
+  }, [user?.id])
 
+  const loadCart = async () => {
+    if (!user?.id || user?.id === 0) {
+      // Usuario invitado - usar localStorage
+      const savedCart = localStorage.getItem('cart_guest')
+      setCart(savedCart ? JSON.parse(savedCart) : [])
+      return
+    }
+
+    setLoading(true)
+    const data = await cartService.getCart(user.id)
+    setCart(data)
+    setLoading(false)
+  }
+
+  // Guardar carrito cuando cambie
   useEffect(() => {
-    localStorage.setItem('cart', JSON.stringify(cart))
-  }, [cart])
+    if (user?.id && user?.id !== 0) {
+      cartService.saveCart(user.id, cart)
+    } else {
+      localStorage.setItem('cart_guest', JSON.stringify(cart))
+    }
+  }, [cart, user?.id])
 
   const addToCart = (product, quantity = 1) => {
     setCart(prevCart => {
@@ -81,6 +99,7 @@ export const CartProvider = ({ children }) => {
     clearCart,
     getCartTotal,
     getCartCount,
+    loadCart,
   }
 
   return (
