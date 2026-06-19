@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react'
 import { authService } from '../services/authService'
+import { userService } from '../services/userService'
 
 const AuthContext = createContext()
 
@@ -18,16 +19,35 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const initAuth = async () => {
+      console.log('🔍 Inicializando autenticación...')
       const storedUser = localStorage.getItem('user')
       const storedToken = localStorage.getItem('jwt')
       
       if (storedToken && storedUser) {
         try {
-          const parsedUser = JSON.parse(storedUser)
-          setToken(storedToken)
-          setUser(parsedUser)
+          // Verificar token con el backend
+          const response = await authService.verifyToken()
+          if (response.valid) {
+            setToken(storedToken)
+            setUser(JSON.parse(storedUser))
+            console.log('✅ Usuario autenticado:', JSON.parse(storedUser).email)
+          } else {
+            console.warn('⚠️ Token inválido, limpiando...')
+            localStorage.removeItem('jwt')
+            localStorage.removeItem('user')
+            setUser(null)
+            setToken(null)
+            // Establecer usuario invitado
+            setUser({
+              id: 0,
+              nombre: 'Invitado',
+              email: 'invitado@byteverse.com',
+              rol: 'INVITADO',
+              activo: true
+            })
+          }
         } catch (error) {
-          console.error('Error parsing user data:', error)
+          console.error('❌ Error verifying token:', error)
           localStorage.removeItem('jwt')
           localStorage.removeItem('user')
           setUser({
@@ -37,8 +57,10 @@ export const AuthProvider = ({ children }) => {
             rol: 'INVITADO',
             activo: true
           })
+          setToken(null)
         }
       } else {
+        console.log('👤 Usuario invitado')
         setUser({
           id: 0,
           nombre: 'Invitado',
@@ -55,23 +77,27 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     try {
+      console.log('🔐 Intentando login...')
       const response = await authService.login({ email, password })
       
       if (response.success) {
-        // Verificar si el usuario necesita cambiar contraseña
+        console.log('✅ Login exitoso')
+        
+        // Verificar si necesita cambiar contraseña
         if (response.needPasswordChange) {
           return { 
             success: true, 
             needPasswordChange: true, 
-            userId: response.user.id,
-            email: response.user.email
+            userId: response.user?.id,
+            email: response.user?.email
           }
         }
         
-        setUser(response.user)
+        const userData = response.user
+        setUser(userData)
         setToken(response.token)
         localStorage.setItem('jwt', response.token)
-        localStorage.setItem('user', JSON.stringify(response.user))
+        localStorage.setItem('user', JSON.stringify(userData))
         
         const redirectTo = sessionStorage.getItem('redirectAfterLogin')
         if (redirectTo) {
@@ -82,7 +108,7 @@ export const AuthProvider = ({ children }) => {
       }
       return { success: false, error: response.error || 'Credenciales inválidas' }
     } catch (error) {
-      console.error('Login error:', error)
+      console.error('❌ Login error:', error)
       return { success: false, error: 'Error de conexión' }
     }
   }
@@ -100,7 +126,7 @@ export const AuthProvider = ({ children }) => {
       }
       return { success: false, error: response.error || 'Error con Google' }
     } catch (error) {
-      console.error('Google login error:', error)
+      console.error('❌ Google login error:', error)
       return { success: false, error: 'Error al conectar con Google' }
     }
   }
@@ -108,13 +134,12 @@ export const AuthProvider = ({ children }) => {
   const register = async (userData) => {
     try {
       const response = await authService.register(userData)
-      
       if (response.success) {
         return { success: true }
       }
       return { success: false, error: response.error || 'Error al registrar' }
     } catch (error) {
-      console.error('Register error:', error)
+      console.error('❌ Register error:', error)
       return { success: false, error: 'Error de conexión' }
     }
   }
@@ -124,9 +149,15 @@ export const AuthProvider = ({ children }) => {
       const updatedUser = { ...user, ...userData }
       setUser(updatedUser)
       localStorage.setItem('user', JSON.stringify(updatedUser))
+      
+      // Sincronizar con backend si es usuario autenticado
+      if (user?.id && user?.id !== 0) {
+        await userService.updateUser(user.id, userData)
+      }
+      
       return { success: true }
     } catch (error) {
-      console.error('Update user error:', error)
+      console.error('❌ Update user error:', error)
       return { success: false, error: error.message }
     }
   }
@@ -134,10 +165,7 @@ export const AuthProvider = ({ children }) => {
   const updatePassword = async (email, userId, newPassword) => {
     try {
       const response = await authService.updatePassword(email, userId, newPassword)
-      if (response.success) {
-        return { success: true }
-      }
-      return { success: false, error: response.error }
+      return response
     } catch (error) {
       return { success: false, error: error.message }
     }
@@ -171,6 +199,7 @@ export const AuthProvider = ({ children }) => {
   }
 
   const logout = () => {
+    authService.logout()
     setUser({
       id: 0,
       nombre: 'Invitado',
@@ -179,9 +208,7 @@ export const AuthProvider = ({ children }) => {
       activo: true
     })
     setToken(null)
-    localStorage.removeItem('jwt')
-    localStorage.removeItem('user')
-    authService.logout()
+    console.log('👋 Sesión cerrada')
   }
 
   const value = {
@@ -197,7 +224,7 @@ export const AuthProvider = ({ children }) => {
     requestPasswordReset,
     verifyResetCode,
     resetPassword,
-    isAuthenticated: user?.rol !== 'INVITADO' && !!user?.id,
+    isAuthenticated: user?.rol !== 'INVITADO' && !!user?.id && user?.id !== 0,
     isAdmin: user?.rol === 'ADMIN',
     isVendedor: user?.rol === 'VENDEDOR',
     isComprador: user?.rol === 'COMPRADOR',
