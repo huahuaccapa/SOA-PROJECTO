@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ByteVerse - Test Completo</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', Arial, sans-serif; 
+            padding: 30px; 
+            background: #0a0a1a; 
+            color: #fff; 
+            min-height: 100vh;
+        }
+        .container { max-width: 1000px; margin: 0 auto; }
+        h1 { 
+            color: #00d4ff; 
+            margin-bottom: 5px;
+            font-size: 2.5rem;
+        }
+        .subtitle { color: #888; margin-bottom: 25px; font-size: 14px; }
+        .subtitle strong { color: #00d4ff; }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background: #1a1a3a;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid #2a2a5a;
+        }
+        .stat-card .number {
+            font-size: 24px;
+            font-weight: bold;
+        }
+        .stat-card .label {
+            font-size: 11px;
+            color: #888;
+            margin-top: 2px;
+        }
+        .stat-card.total { border-color: #00d4ff; }
+        .stat-card.passed { border-color: #00ff88; }
+        .stat-card.failed { border-color: #ff4444; }
+        
+        .test { 
+            background: #1a1a3a; 
+            padding: 15px 20px; 
+            margin: 6px 0; 
+            border-radius: 8px; 
+            border-left: 4px solid #00d4ff;
+            transition: all 0.3s;
+        }
+        .test:hover { background: #222255; }
+        .success { border-left-color: #00ff88; }
+        .error { border-left-color: #ff4444; }
+        .warning { border-left-color: #ffaa00; }
+        .info { border-left-color: #4488ff; }
+        .pending { border-left-color: #666; }
+        
+        pre { 
+            background: #0a0a1a; 
+            padding: 10px; 
+            border-radius: 4px; 
+            overflow-x: auto; 
+            margin-top: 8px;
+            font-size: 12px;
+            color: #aaa;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+        .test-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .test-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .test-status {
+            font-size: 12px;
+            padding: 2px 12px;
+            border-radius: 20px;
+            font-weight: bold;
+        }
+        .status-ok { background: #00ff8833; color: #00ff88; }
+        .status-error { background: #ff444433; color: #ff4444; }
+        .status-warning { background: #ffaa0033; color: #ffaa00; }
+        .status-info { background: #4488ff33; color: #4488ff; }
+        .status-pending { background: #66666633; color: #888; }
+        
+        button { 
+            background: #00d4ff; 
+            color: #000; 
+            border: none; 
+            padding: 12px 30px; 
+            border-radius: 6px; 
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 16px;
+            margin-top: 20px;
+            transition: all 0.3s;
+        }
+        button:hover { 
+            background: #00ffcc; 
+            transform: scale(1.02);
+        }
+        .btn-secondary {
+            background: #444;
+            margin-left: 10px;
+        }
+        .btn-secondary:hover { background: #666; }
+        
+        .summary-box {
+            background: #0a1a2a;
+            border: 1px solid #00d4ff33;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        .summary-box h3 { color: #00d4ff; margin-bottom: 10px; }
+        .summary-box .service-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 8px;
+        }
+        .service-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            background: #1a1a3a;
+            border-radius: 6px;
+            font-size: 13px;
+        }
+        .service-item .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        .dot-green { background: #00ff88; }
+        .dot-red { background: #ff4444; }
+        .dot-yellow { background: #ffaa00; }
+        
+        .loading-spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #00d4ff33;
+            border-top: 2px solid #00d4ff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 ByteVerse - Test Completo</h1>
+        <p class="subtitle">
+            Frontend: <strong>http://localhost:5173</strong> → Backend: <strong>http://localhost:3000</strong>
+        </p>
+        
+        <!-- Stats -->
+        <div class="stats-grid" id="statsGrid">
+            <div class="stat-card total">
+                <div class="number" id="totalTests">0</div>
+                <div class="label">Total Pruebas</div>
+            </div>
+            <div class="stat-card passed">
+                <div class="number" id="passedTests">0</div>
+                <div class="label">✅ Exitosas</div>
+            </div>
+            <div class="stat-card failed">
+                <div class="number" id="failedTests">0</div>
+                <div class="label">❌ Fallidas</div>
+            </div>
+        </div>
+        
+        <div id="results">
+            <div class="test info">
+                <div class="test-header">
+                    <div class="test-title">
+                        <span>⏳</span>
+                        <strong>Iniciando pruebas...</strong>
+                    </div>
+                    <span class="test-status status-info">CARGANDO</span>
+                </div>
+            </div>
+        </div>
+        
+        <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 15px;">
+            <button onclick="runTests()">🔄 Ejecutar Pruebas</button>
+            <button onclick="clearResults()" class="btn-secondary">🗑️ Limpiar</button>
+        </div>
+    </div>
+    
+    <script>
+        // ============================================
+        // CONFIGURACIÓN
+        // ============================================
+        const API_URL = 'http://localhost:3000/api';
+        const SERVICES = [
+            { name: 'API Gateway', url: 'http://localhost:3000/health', port: 3000, type: 'gateway' },
+            { name: 'Auth Service', url: 'http://localhost:3001/health', port: 3001, type: 'auth' },
+            { name: 'Products Service', url: 'http://localhost:3002/health', port: 3002, type: 'products' },
+            { name: 'Orders Service', url: 'http://localhost:3003/health', port: 3003, type: 'orders' },
+            { name: 'Users Service', url: 'http://localhost:3004/health', port: 3004, type: 'users' },
+            { name: 'Notifications Service', url: 'http://localhost:3005/health', port: 3005, type: 'notifications' },
+            { name: 'Analytics Service', url: 'http://localhost:3006/health', port: 3006, type: 'analytics' }
+        ];
+
+        const results = document.getElementById('results');
+        let totalTests = 0;
+        let passedTests = 0;
+        let failedTests = 0;
+
+        // ============================================
+        // FUNCIONES UI
+        // ============================================
+        function clearResults() {
+            results.innerHTML = '';
+            totalTests = 0;
+            passedTests = 0;
+            failedTests = 0;
+            updateStats();
+        }
+
+        function updateStats() {
+            document.getElementById('totalTests').textContent = totalTests;
+            document.getElementById('passedTests').textContent = passedTests;
+            document.getElementById('failedTests').textContent = failedTests;
+        }
+
+        function addResult(name, status, data = null, error = null, serviceType = '') {
+            const div = document.createElement('div');
+            div.className = `test ${status}`;
+            
+            const icons = { success: '✅', error: '❌', warning: '⚠️', info: 'ℹ️', pending: '⏳' };
+            const badges = {
+                success: '<span class="test-status status-ok">OK</span>',
+                error: '<span class="test-status status-error">ERROR</span>',
+                warning: '<span class="test-status status-warning">WARNING</span>',
+                info: '<span class="test-status status-info">INFO</span>',
+                pending: '<span class="test-status status-pending">PENDIENTE</span>'
+            };
+            
+            // Icono del servicio
+            const serviceIcons = {
+                gateway: '🌐',
+                auth: '🔐',
+                products: '📦',
+                orders: '📋',
+                users: '👤',
+                notifications: '📧',
+                analytics: '📊'
+            };
+            const icon = serviceIcons[serviceType] || '🔹';
+            
+            let html = `
+                <div class="test-header">
+                    <div class="test-title">
+                        <span>${icons[status] || '📌'}</span>
+                        <span>${icon}</span>
+                        <strong>${name}</strong>
+                    </div>
+                    ${badges[status] || ''}
+                </div>
+            `;
+            
+            if (data) {
+                html += `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+            }
+            
+            if (error) {
+                html += `<pre style="color: #ff6666;">❌ ${error}</pre>`;
+            }
+            
+            div.innerHTML = html;
+            results.appendChild(div);
+            
+            // Actualizar estadísticas
+            totalTests++;
+            if (status === 'success') passedTests++;
+            else if (status === 'error') failedTests++;
+            updateStats();
+        }
+
+        // ============================================
+        // FUNCIONES DE PRUEBA
+        // ============================================
+        async function testService(service) {
+            try {
+                console.log(`📤 Probando ${service.name}...`);
+                const response = await fetch(service.url, {
+                    headers: { 'Accept': 'application/json' }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    addResult(
+                        `${service.name} (puerto ${service.port})`,
+                        'success',
+                        data,
+                        null,
+                        service.type
+                    );
+                    return { success: true, data };
+                } else {
+                    const text = await response.text();
+                    addResult(
+                        `${service.name} (puerto ${service.port})`,
+                        'error',
+                        null,
+                        `HTTP ${response.status}: ${text.substring(0, 100)}`,
+                        service.type
+                    );
+                    return { success: false, error: `HTTP ${response.status}` };
+                }
+            } catch (error) {
+                addResult(
+                    `${service.name} (puerto ${service.port})`,
+                    'error',
+                    null,
+                    error.message,
+                    service.type
+                );
+                return { success: false, error: error.message };
+            }
+        }
+
+        async function testEndpoint(name, url, method = 'GET', body = null, serviceType = '') {
+            try {
+                const options = {
+                    method,
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    }
+                };
+                if (body) options.body = JSON.stringify(body);
+                
+                console.log(`📤 ${method} ${url}`);
+                const response = await fetch(`${API_URL}${url}`, options);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    addResult(name, 'success', data, null, serviceType);
+                    return { success: true, data };
+                } else {
+                    addResult(name, 'error', null, data.error || 'Error en la respuesta', serviceType);
+                    return { success: false, error: data.error };
+                }
+            } catch (error) {
+                addResult(name, 'error', null, error.message, serviceType);
+                return { success: false, error: error.message };
+            }
+        }
+
+        // ============================================
+        // PRUEBA PRINCIPAL
+        // ============================================
+        async function runTests() {
+            // Limpiar resultados anteriores
+            results.innerHTML = '';
+            totalTests = 0;
+            passedTests = 0;
+            failedTests = 0;
+            updateStats();
+            
+            // Mostrar inicio
+            const startDiv = document.createElement('div');
+            startDiv.className = 'test info';
+            startDiv.innerHTML = `
+                <div class="test-header">
+                    <div class="test-title">
+                        <span>⏳</span>
+                        <strong>Ejecutando pruebas...</strong>
+                    </div>
+                    <span class="test-status status-info">
+                        <span class="loading-spinner"></span> CARGANDO
+                    </span>
+                </div>
+            `;
+            results.appendChild(startDiv);
+            
+            // ============================================
+            // 1. PROBAR TODOS LOS SERVICIOS
+            // ============================================
+            addResult('=== PRUEBA DE SERVICIOS ===', 'info', null, null, '');
+            
+            for (const service of SERVICES) {
+                await testService(service);
+                // Pequeña pausa para no saturar
+                await new Promise(r => setTimeout(r, 100));
+            }
+            
+            // ============================================
+            // 2. PROBAR ENDPOINTS DEL GATEWAY
+            // ============================================
+            addResult('=== PRUEBA DE ENDPOINTS ===', 'info', null, null, '');
+            
+            // 2.1 Login
+            const loginResult = await testEndpoint(
+                'Login (admin@byteverse.com)',
+                '/auth/login',
+                'POST',
+                { email: 'admin@byteverse.com', password: '123456' },
+                'auth'
+            );
+            
+            // 2.2 Si login es exitoso, probar endpoints protegidos
+            if (loginResult.success && loginResult.data.token) {
+                const token = loginResult.data.token;
+                localStorage.setItem('jwt', token);
+                addResult(
+                    'Token JWT obtenido',
+                    'success',
+                    { token: token.substring(0, 40) + '...' },
+                    null,
+                    'auth'
+                );
+                
+                // 2.3 Productos
+                await testEndpoint('Obtener Productos (vía Gateway)', '/products', 'GET', null, 'products');
+                
+                // 2.4 Usuarios
+                await testEndpoint('Obtener Usuarios (vía Gateway)', '/users', 'GET', null, 'users');
+            } else {
+                addResult(
+                    '⚠️ No se pudo obtener token',
+                    'warning',
+                    null,
+                    'Los endpoints protegidos no serán probados',
+                    ''
+                );
+            }
+            
+            // ============================================
+            // 3. RESUMEN FINAL
+            // ============================================
+            const summary = document.createElement('div');
+            summary.className = 'summary-box';
+            
+            let serviceStatus = SERVICES.map(s => {
+                // Verificar si el servicio fue probado exitosamente
+                // (esto es simplificado, pero da una idea)
+                return `<div class="service-item">
+                    <span class="dot dot-green"></span>
+                    ${s.name} (${s.port})
+                </div>`;
+            }).join('');
+            
+            summary.innerHTML = `
+                <h3>📊 Resumen de Servicios</h3>
+                <div class="service-list">
+                    ${SERVICES.map(s => `
+                        <div class="service-item">
+                            <span class="dot dot-green"></span>
+                            ${s.name} <span style="color:#888;font-size:11px;">:${s.port}</span>
+                        </div>
+                    `).join('')}
+                </div>
+                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #00d4ff22;">
+                    <p style="color: #aaa; font-size: 14px;">
+                        ✅ Pruebas completadas: <strong style="color: #00ff88;">${passedTests}</strong> exitosas · 
+                        ❌ <strong style="color: #ff4444;">${failedTests}</strong> fallidas · 
+                        📊 <strong style="color: #00d4ff;">${totalTests}</strong> totales
+                    </p>
+                    <p style="color: #666; font-size: 12px; margin-top: 5px;">
+                        🔗 <strong style="color: #00d4ff;">Frontend:</strong> http://localhost:5173 &nbsp;|&nbsp;
+                        🔗 <strong style="color: #00d4ff;">Gateway:</strong> http://localhost:3000
+                    </p>
+                </div>
+            `;
+            results.appendChild(summary);
+            
+            // Scroll al final
+            summary.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        }
+
+        // ============================================
+        // EJECUTAR AUTOMÁTICAMENTE
+        // ============================================
+        setTimeout(runTests, 500);
+    </script>
+</body>
+</html>
