@@ -1,0 +1,168 @@
+version: '3.8'
+
+services:
+  # Message Queue
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    networks:
+      - byteverse-network
+    healthcheck:
+      test: ["CMD", "rabbitmqctl", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MongoDB
+  mongodb:
+    image: mongo:6.0
+    container_name: mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password
+      MONGO_INITDB_DATABASE: byteverse
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - byteverse-network
+
+  # Redis
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    networks:
+      - byteverse-network
+
+  # API Gateway
+  api-gateway:
+    build: ./api-gateway
+    container_name: api-gateway
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - JWT_SECRET=byteverse_secret_key_2024
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - byteverse-network
+
+  # Auth Service
+  auth-service:
+    build: ./services/auth-service
+    container_name: auth-service
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - JWT_SECRET=byteverse_secret_key_2024
+      - MONGODB_URI=mongodb://admin:password@mongodb:27017/byteverse?authSource=admin
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+    depends_on:
+      mongodb:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - byteverse-network
+
+  # Products Service (Python)
+  products-service:
+    build: ./services/products-service
+    container_name: products-service
+    ports:
+      - "3002:3002"
+    environment:
+      - MONGODB_URI=mongodb://admin:password@mongodb:27017/byteverse?authSource=admin
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+    depends_on:
+      mongodb:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - byteverse-network
+
+  # Orders Service (Node.js)
+  orders-service:
+    build: ./services/orders-service
+    container_name: orders-service
+    ports:
+      - "3003:3003"
+    environment:
+      - MONGODB_URI=mongodb://admin:password@mongodb:27017/byteverse?authSource=admin
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+    depends_on:
+      mongodb:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - byteverse-network
+
+  # Users Service
+  users-service:
+    build: ./services/users-service
+    container_name: users-service
+    ports:
+      - "3004:3004"
+    environment:
+      - MONGODB_URI=mongodb://admin:password@mongodb:27017/byteverse?authSource=admin
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+    depends_on:
+      mongodb:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - byteverse-network
+
+  # Notifications Service (Python)
+  notifications-service:
+    build: ./services/notifications-service
+    container_name: notifications-service
+    ports:
+      - "3005:3005"
+    environment:
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - byteverse-network
+
+  # Analytics Service
+  analytics-service:
+    build: ./services/analytics-service
+    container_name: analytics-service
+    ports:
+      - "3006:3006"
+    environment:
+      - MONGODB_URI=mongodb://admin:password@mongodb:27017/byteverse?authSource=admin
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+    depends_on:
+      mongodb:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - byteverse-network
+
+volumes:
+  mongodb_data:
+    driver: local
+
+networks:
+  byteverse-network:
+    driver: bridge

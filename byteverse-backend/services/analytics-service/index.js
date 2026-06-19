@@ -1,0 +1,132 @@
+const express = require('express');
+const mongoose = require('mongoose');
+const amqp = require('amqplib');
+const cors = require('cors');
+require('dotenv').config();
+
+const app = express();
+const PORT = process.env.PORT || 3006;
+
+app.use(cors());
+app.use(express.json());
+
+// Modelos
+const EventSchema = new mongoose.Schema({
+  event: String,
+  userId: Number,
+  email: String,
+  data: mongoose.Schema.Types.Mixed,
+  timestamp: { type: Date, default: Date.now }
+});
+
+const MetricSchema = new mongoose.Schema({
+  metric: String,
+  value: { type: Number, default: 0 },
+  date: { type: Date, default: Date.now },
+  period: { type: String, enum: ['day', 'week', 'month'] }
+});
+
+const Event = mongoose.model('AnalyticsEvent', EventSchema);
+const Metric = mongoose.model('Metric', MetricSchema);
+
+// Conectar a MongoDB
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://mongodb:27017/byteverse')
+  .then(() => console.log('✅ Analytics Service conectado a MongoDB'))
+  .catch(err => console.error('❌ Error MongoDB:', err));
+
+// Conectar a RabbitMQ
+let channel;
+async function connectRabbitMQ() {
+  try {
+    const connection = await amqp.connect(process.env.RABBITMQ_URL || 'amqp://rabbitmq:5672');
+    channel = await connection.createChannel();
+    
+    // Consumir eventos
+    const queues = ['auth_events', 'order_events', 'product_events'];
+    for (const queue of queues) {
+      await channel.assertQueue(queue);
+      channel.consume(queue, async (msg) => {
+        if (msg) {
+          try {
+            const event = JSON.parse(msg.content.toString());
+            await processEvent(event);
+            channel.ack(msg);
+          } catch (error) {
+            console.error('Error procesando evento:', error);
+            channel.ack(msg);
+          }
+        }
+      }, { noAck: false });
+    }
+    
+    console.log('✅ Analytics Service conectado a RabbitMQ');
+  } catch (error) {
+    console.error('❌ Error RabbitMQ:', error.message);
+  }
+}
+
+async function processEvent(event) {
+  console.log(`📊 Evento: ${event.event}`);
+  
+  // Guardar evento
+  await Event.create({
+    event: event.event,
+    userId: event.userId,
+    email: event.email,
+    data: event,
+    timestamp: new Date()
+  });
+  
+  // Actualizar métricas
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  const metricMap = {
+    'USER_REGISTERED': 'new_users',
+    'USER_LOGIN': 'user_logins',
+    'ORDER_CREATED': 'orders_created',
+    'PRODUCT_CREATED': 'products_created'
+  };
+  
+  const metricName = metricMap[event.event] || 'other_events';
+  
+  // Actualizar métrica diaria
+  await Metric.findOneAndUpdate(
+    { metric: metricName, date: today, period: 'day' },
+    { $inc: { value: 1 } },
+    { upsert: true }
+  );
+}
+
+// Endpoints
+app.get('/analytics/events', async (req, res) => {
+  try {
+    const { limit = 50 } = req.query;
+    const events = await Event.find()
+      .sort({ timestamp: -1 })
+      .limit(parseInt(limit));
+    res.json(events);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/analytics/metrics', async (req, res) => {
+  try {
+    const { period = 'day' } = req.query;
+    const metrics = await Metric.find({ period });
+    res.json(metrics);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/health', (req, res) => {
+  res.json({ status: 'OK', service: 'analytics-service' });
+});
+
+connectRabbitMQ().then(() => {
+  app.listen(PORT, () => {
+    console.log(`✅ Analytics Service running on port ${PORT}`);
+  });
+});
