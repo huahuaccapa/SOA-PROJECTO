@@ -1,9 +1,13 @@
+// backend/api-gateway/index.js
 const express = require('express');
 const cors = require('cors');
 const { createProxyMiddleware } = require('http-proxy-middleware');
 
 const app = express();
 const PORT = 3000;
+
+// Configuración del frontend
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
 // CORS más permisivo
 app.use(cors({
@@ -21,6 +25,43 @@ app.get('/health', (req, res) => {
         service: 'API Gateway',
         timestamp: new Date().toISOString()
     });
+});
+
+// ✅ AGREGADO: Redirección de rutas del frontend al frontend
+app.get('/login', (req, res) => {
+    res.redirect(`${FRONTEND_URL}/login`);
+});
+
+app.get('/register', (req, res) => {
+    res.redirect(`${FRONTEND_URL}/register`);
+});
+
+app.get('/products', (req, res) => {
+    res.redirect(`${FRONTEND_URL}/products`);
+});
+
+app.get('/profile', (req, res) => {
+    res.redirect(`${FRONTEND_URL}/profile`);
+});
+
+app.get('/orders', (req, res) => {
+    res.redirect(`${FRONTEND_URL}/orders`);
+});
+
+app.get('/admin', (req, res) => {
+    res.redirect(`${FRONTEND_URL}/admin`);
+});
+
+app.get('/admin/*', (req, res) => {
+    res.redirect(`${FRONTEND_URL}${req.originalUrl}`);
+});
+
+app.get('/vendor', (req, res) => {
+    res.redirect(`${FRONTEND_URL}/vendor`);
+});
+
+app.get('/checkout', (req, res) => {
+    res.redirect(`${FRONTEND_URL}/checkout`);
 });
 
 // Proxy
@@ -70,4 +111,5 @@ app.use('*', (req, res) => {
 
 app.listen(PORT, () => {
     console.log(`✅ API Gateway running on port ${PORT}`);
+    console.log(`🔄 Redirigiendo rutas de frontend a: ${FRONTEND_URL}`);
 });
