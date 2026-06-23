@@ -1,6 +1,8 @@
+// frontend/src/services/api.js
 import axios from 'axios'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api'
+const FRONTEND_URL = import.meta.env.VITE_FRONTEND_URL || 'http://localhost:5173'
 
 // Crear instancia de axios
 const api = axios.create({
@@ -15,6 +17,7 @@ const api = axios.create({
 
 // Log para depuración
 console.log('🔗 API URL:', API_URL)
+console.log('🔗 FRONTEND URL:', FRONTEND_URL)
 
 // Interceptor para añadir token JWT a todas las peticiones
 api.interceptors.request.use(
@@ -32,21 +35,23 @@ api.interceptors.request.use(
   }
 )
 
-// Interceptor para manejar respuestas
+// ✅ INTERCEPTOR CORREGIDO - Redirige al FRONTEND correctamente
 api.interceptors.response.use(
   (response) => {
     console.log(`📥 ${response.status} ${response.config.url}`, response.data)
     return response
   },
   (error) => {
-    // Manejar errores de autenticación
+    // Manejar errores de autenticación (401)
     if (error.response?.status === 401) {
       console.warn('🔒 Token expirado o inválido')
       localStorage.removeItem('jwt')
       localStorage.removeItem('user')
-      // Solo redirigir si no estamos ya en login
+      
+      // ✅ CORREGIDO: Redirigir al FRONTEND, no al backend
       if (!window.location.pathname.includes('/login')) {
-        window.location.href = '/login'
+        // Usar la URL completa del frontend
+        window.location.href = `${FRONTEND_URL}/login`
       }
     }
     
