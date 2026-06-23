@@ -52,6 +52,7 @@ services:
     environment:
       - NODE_ENV=production
       - JWT_SECRET=byteverse_secret_key_2024
+      - FRONTEND_URL=http://localhost:5173  # ✅ AGREGADO
     depends_on:
       rabbitmq:
         condition: service_healthy
