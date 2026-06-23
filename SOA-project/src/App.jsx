@@ -16,6 +16,7 @@ import Login from './components/Auth/Login'
 import Register from './components/Auth/Register'
 import { Toaster } from 'react-hot-toast'
 
+
 function App() {
   const location = useLocation()
 
