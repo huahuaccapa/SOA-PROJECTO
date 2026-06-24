@@ -12,6 +12,8 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
+console.log('🚀 Auth Service iniciando...');
+
 // Modelo de Usuario
 const UserSchema = new mongoose.Schema({
   nombre: { type: String, required: true },
@@ -24,84 +26,148 @@ const UserSchema = new mongoose.Schema({
   },
   activo: { type: Boolean, default: true },
   fechaRegistro: { type: Date, default: Date.now },
-  direccion: {
-    departamento: String,
-    provincia: String,
-    distrito: String,
-    linea: String,
-    referencia: String
-  },
-  needPasswordChange: { type: Boolean, default: false }
+  needPasswordChange: { type: Boolean, default: false },
+  refreshToken: { type: String }
 });
 
-// IMPORTANTE: Crear usuarios por defecto
 const User = mongoose.model('User', UserSchema);
 
 // Conectar a MongoDB
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://mongodb:27017/byteverse')
+console.log('📡 Conectando a MongoDB...');
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://admin:password@mongodb:27017/byteverse?authSource=admin', {
+  serverSelectionTimeoutMS: 10000,
+  socketTimeoutMS: 45000,
+})
   .then(async () => {
     console.log('✅ Auth Service conectado a MongoDB');
-    
-    // Crear usuarios por defecto
-    const defaultUsers = [
-      {
-        nombre: 'Administrador',
-        email: 'admin@byteverse.com',
-        password: await bcrypt.hash('123456', 10),
-        role: 'ADMIN',
-        activo: true
-      },
-      {
-        nombre: 'Usuario Comprador',
-        email: 'comprador@byteverse.com',
-        password: await bcrypt.hash('123456', 10),
-        role: 'COMPRADOR',
-        activo: true
-      },
-      {
-        nombre: 'Vendedor Tech',
-        email: 'vendedor@byteverse.com',
-        password: await bcrypt.hash('123456', 10),
-        role: 'VENDEDOR',
-        activo: true,
-        needPasswordChange: true
-      },
-      {
-        nombre: 'Usuario Demo',
-        email: 'user@byteverse.com',
-        password: await bcrypt.hash('123456', 10),
-        role: 'COMPRADOR',
-        activo: true
-      }
-    ];
+    await createDefaultUsers();
+    console.log('📦 Usuarios por defecto listos');
+  })
+  .catch(err => {
+    console.error('❌ Error MongoDB:', err.message);
+  });
 
-    for (const userData of defaultUsers) {
+// RabbitMQ
+let channel;
+async function connectRabbitMQ() {
+  try {
+    console.log('📡 Conectando a RabbitMQ...');
+    const connection = await amqp.connect(process.env.RABBITMQ_URL || 'amqp://rabbitmq:5672');
+    channel = await connection.createChannel();
+    await channel.assertQueue('auth_events', { durable: true });
+    await channel.assertQueue('user_sync_queue', { durable: true });
+    await channel.assertQueue('auth_response_queue', { durable: true });
+    console.log('✅ Auth Service conectado a RabbitMQ');
+    return channel;
+  } catch (error) {
+    console.error('❌ Error RabbitMQ:', error.message);
+    return null;
+  }
+}
+
+// Crear usuarios por defecto
+async function createDefaultUsers() {
+  const defaultUsers = [
+    {
+      nombre: 'Administrador',
+      email: 'admin@byteverse.com',
+      password: await bcrypt.hash('123456', 10),
+      role: 'ADMIN',
+      activo: true
+    },
+    {
+      nombre: 'Usuario Comprador',
+      email: 'comprador@byteverse.com',
+      password: await bcrypt.hash('123456', 10),
+      role: 'COMPRADOR',
+      activo: true
+    },
+    {
+      nombre: 'Vendedor Tech',
+      email: 'vendedor@byteverse.com',
+      password: await bcrypt.hash('123456', 10),
+      role: 'VENDEDOR',
+      activo: true,
+      needPasswordChange: true
+    },
+    {
+      nombre: 'Usuario Demo',
+      email: 'user@byteverse.com',
+      password: await bcrypt.hash('123456', 10),
+      role: 'COMPRADOR',
+      activo: true
+    }
+  ];
+
+  for (const userData of defaultUsers) {
+    try {
       const existing = await User.findOne({ email: userData.email });
       if (!existing) {
         await User.create(userData);
         console.log(`👤 Usuario creado: ${userData.email}`);
       }
+    } catch (error) {
+      console.error(`❌ Error creando usuario ${userData.email}:`, error.message);
     }
-  })
-  .catch(err => console.error('❌ Error MongoDB:', err));
-
-// Conectar a RabbitMQ
-let channel;
-async function connectRabbitMQ() {
-  try {
-    const connection = await amqp.connect(process.env.RABBITMQ_URL || 'amqp://rabbitmq:5672');
-    channel = await connection.createChannel();
-    await channel.assertQueue('auth_events');
-    console.log('✅ Auth Service conectado a RabbitMQ');
-  } catch (error) {
-    console.error('❌ Error RabbitMQ:', error.message);
   }
 }
 
-// Endpoints
+// Sincronizar usuario con Users Service
+async function syncUserToUsersService(user) {
+  try {
+    if (!channel) {
+      console.warn('⚠️ RabbitMQ no disponible');
+      return;
+    }
+
+    const userData = {
+      id: user._id.toString(),
+      nombre: user.nombre,
+      email: user.email,
+      role: user.role,
+      activo: user.activo,
+      fechaRegistro: user.fechaRegistro
+    };
+
+    await channel.sendToQueue('user_sync_queue', Buffer.from(JSON.stringify(userData)), { persistent: true });
+    console.log(`📤 Usuario enviado a sincronización: ${user.email}`);
+    
+    await User.findByIdAndUpdate(user._id, {
+      syncStatus: 'PENDING',
+      lastSyncAttempt: new Date()
+    });
+
+    return true;
+  } catch (error) {
+    console.error(`❌ Error sincronizando usuario ${user.email}:`, error);
+    return false;
+  }
+}
+
+// ENDPOINTS
+
+// Health check
+app.get('/health', (req, res) => {
+  res.json({ 
+    status: 'OK', 
+    service: 'auth-service',
+    mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+    rabbitmq: channel ? 'connected' : 'disconnected'
+  });
+});
+
+// Login
 app.post('/login', async (req, res) => {
   try {
+    console.log(`🔐 Login intento: ${req.body.email}`);
     const { email, password } = req.body;
+    
+    if (!email || !password) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Email y contraseña requeridos' 
+      });
+    }
     
     const user = await User.findOne({ email });
     if (!user) {
@@ -117,25 +183,35 @@ app.post('/login', async (req, res) => {
       return res.status(401).json({ success: false, error: 'Credenciales inválidas' });
     }
     
-    const token = jwt.sign(
+    console.log(`✅ Login exitoso: ${email}`);
+    
+    const accessToken = jwt.sign(
       { userId: user._id, email: user.email, role: user.role },
       process.env.JWT_SECRET || 'secret',
-      { expiresIn: '24h' }
+      { expiresIn: '15m' }
     );
     
-    // Publicar evento
+    const refreshToken = jwt.sign(
+      { userId: user._id, email: user.email },
+      process.env.REFRESH_SECRET || 'refresh_secret',
+      { expiresIn: '7d' }
+    );
+    
+    await User.findByIdAndUpdate(user._id, { refreshToken });
+    
     if (channel) {
-      channel.sendToQueue('auth_events', Buffer.from(JSON.stringify({
+      await channel.sendToQueue('auth_events', Buffer.from(JSON.stringify({
         event: 'USER_LOGIN',
         userId: user._id,
         email: user.email,
         timestamp: new Date().toISOString()
-      })));
+      })), { persistent: true });
     }
     
     res.json({
       success: true,
-      token,
+      accessToken,
+      refreshToken,
       user: {
         id: user._id,
         nombre: user.nombre,
@@ -145,10 +221,12 @@ app.post('/login', async (req, res) => {
       }
     });
   } catch (error) {
+    console.error('❌ Error en login:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
+// Registro
 app.post('/register', async (req, res) => {
   try {
     const { nombre, email, password, role } = req.body;
@@ -167,17 +245,20 @@ app.post('/register', async (req, res) => {
     });
     
     await user.save();
+    console.log(`✅ Usuario registrado: ${email}`);
     
-    // Publicar evento
+    // Sincronizar con Users Service
+    await syncUserToUsersService(user);
+    
     if (channel) {
-      channel.sendToQueue('auth_events', Buffer.from(JSON.stringify({
+      await channel.sendToQueue('auth_events', Buffer.from(JSON.stringify({
         event: 'USER_REGISTERED',
         userId: user._id,
         email: user.email,
         nombre: user.nombre,
         role: user.role,
         timestamp: new Date().toISOString()
-      })));
+      })), { persistent: true });
     }
     
     res.status(201).json({
@@ -190,10 +271,44 @@ app.post('/register', async (req, res) => {
       }
     });
   } catch (error) {
+    console.error('❌ Error en registro:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
+// Refresh Token
+app.post('/refresh-token', async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+    
+    if (!refreshToken) {
+      return res.status(401).json({ success: false, error: 'Refresh token requerido' });
+    }
+    
+    const decoded = jwt.verify(refreshToken, process.env.REFRESH_SECRET || 'refresh_secret');
+    const user = await User.findById(decoded.userId);
+    
+    if (!user) {
+      return res.status(401).json({ success: false, error: 'Usuario no encontrado' });
+    }
+    
+    const newAccessToken = jwt.sign(
+      { userId: user._id, email: user.email, role: user.role },
+      process.env.JWT_SECRET || 'secret',
+      { expiresIn: '15m' }
+    );
+    
+    res.json({
+      success: true,
+      accessToken: newAccessToken
+    });
+  } catch (error) {
+    console.error('❌ Error en refresh token:', error);
+    res.status(401).json({ success: false, error: 'Refresh token inválido' });
+  }
+});
+
+// Verificar token
 app.get('/verify', async (req, res) => {
   try {
     const token = req.headers.authorization?.split(' ')[1];
@@ -208,6 +323,7 @@ app.get('/verify', async (req, res) => {
   }
 });
 
+// Cambiar contraseña
 app.post('/change-password', async (req, res) => {
   try {
     const { email, newPassword } = req.body;
@@ -228,13 +344,26 @@ app.post('/change-password', async (req, res) => {
   }
 });
 
-app.get('/health', (req, res) => {
-  res.json({ status: 'OK', service: 'auth-service' });
+// Logout
+app.post('/logout', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (token) {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret');
+      await User.findByIdAndUpdate(decoded.userId, { refreshToken: null });
+    }
+    res.json({ success: true });
+  } catch (error) {
+    res.json({ success: true });
+  }
 });
 
-// Iniciar
-connectRabbitMQ().then(() => {
-  app.listen(PORT, () => {
-    console.log(`✅ Auth Service running on port ${PORT}`);
-  });
+// Iniciar servidor
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`✅ Auth Service running on port ${PORT}`);
 });
+
+// Conectar RabbitMQ
+setTimeout(() => {
+  connectRabbitMQ();
+}, 2000);
