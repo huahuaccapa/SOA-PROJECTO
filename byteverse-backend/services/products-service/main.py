@@ -95,21 +95,6 @@ async def create_default_products():
             "tieneIGV": True,
             "deliveryGratis": False,
             "fechaCreacion": datetime.now().isoformat()
-        },
-        {
-            "nombre": "Sony WH-1000XM5",
-            "descripcion": "Audífonos con cancelación de ruido líder en la industria",
-            "precio": 1299.99,
-            "stock": 25,
-            "categoria": "Audífonos",
-            "imagen": "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=300&h=200&fit=crop",
-            "caracteristicas": ["Cancelación de ruido", "30 horas batería", "Bluetooth 5.2"],
-            "vendedorId": 4,
-            "vendedorNombre": "GamerWorld",
-            "activo": True,
-            "tieneIGV": True,
-            "deliveryGratis": True,
-            "fechaCreacion": datetime.now().isoformat()
         }
     ]
     
@@ -119,11 +104,7 @@ async def create_default_products():
             await products_collection.insert_one(product)
             print(f"📦 Producto creado: {product['nombre']}")
 
-# Endpoints
-@app.get("/")
-async def root():
-    return {"service": "Products Service", "status": "healthy"}
-
+# ENDPOINTS
 @app.get("/health")
 async def health():
     return {"status": "OK", "service": "products-service"}
@@ -161,7 +142,6 @@ async def create_product(product: ProductCreate):
     result = await products_collection.insert_one(product_data)
     product_data["_id"] = str(result.inserted_id)
     
-    # Publicar evento
     if rabbitmq_channel:
         await rabbitmq_channel.default_exchange.publish(
             aio_pika.Message(
