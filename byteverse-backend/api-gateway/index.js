@@ -1,115 +1,175 @@
-// backend/api-gateway/index.js
 const express = require('express');
 const cors = require('cors');
 const { createProxyMiddleware } = require('http-proxy-middleware');
+const rateLimit = require('express-rate-limit');
+const helmet = require('helmet');
+require('dotenv').config();
 
 const app = express();
 const PORT = 3000;
-
-// Configuración del frontend
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
-// CORS más permisivo
-app.use(cors({
-    origin: '*',
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Accept']
+// Security
+app.use(helmet({
+  crossOriginResourcePolicy: false,
 }));
 
-app.use(express.json());
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  message: 'Demasiadas peticiones, por favor intenta más tarde'
+});
+app.use('/api', limiter);
+
+// CORS
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-Refresh-Token']
+}));
+
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Logging middleware
+app.use((req, res, next) => {
+  console.log(`📤 ${req.method} ${req.url}`);
+  next();
+});
 
 // Health check
 app.get('/health', (req, res) => {
-    res.json({ 
-        status: 'OK', 
-        service: 'API Gateway',
-        timestamp: new Date().toISOString()
-    });
+  res.json({
+    status: 'OK',
+    service: 'API Gateway',
+    timestamp: new Date().toISOString()
+  });
 });
 
-// ✅ AGREGADO: Redirección de rutas del frontend al frontend
-app.get('/login', (req, res) => {
-    res.redirect(`${FRONTEND_URL}/login`);
-});
-
-app.get('/register', (req, res) => {
-    res.redirect(`${FRONTEND_URL}/register`);
-});
-
-app.get('/products', (req, res) => {
-    res.redirect(`${FRONTEND_URL}/products`);
-});
-
-app.get('/profile', (req, res) => {
-    res.redirect(`${FRONTEND_URL}/profile`);
-});
-
-app.get('/orders', (req, res) => {
-    res.redirect(`${FRONTEND_URL}/orders`);
-});
-
-app.get('/admin', (req, res) => {
-    res.redirect(`${FRONTEND_URL}/admin`);
+// Redirección de rutas del frontend
+const frontendRoutes = ['/login', '/register', '/products', '/profile', '/orders', '/admin', '/vendor', '/checkout'];
+frontendRoutes.forEach(route => {
+  app.get(route, (req, res) => {
+    res.redirect(`${FRONTEND_URL}${req.originalUrl}`);
+  });
 });
 
 app.get('/admin/*', (req, res) => {
-    res.redirect(`${FRONTEND_URL}${req.originalUrl}`);
+  res.redirect(`${FRONTEND_URL}${req.originalUrl}`);
 });
 
-app.get('/vendor', (req, res) => {
-    res.redirect(`${FRONTEND_URL}/vendor`);
-});
-
-app.get('/checkout', (req, res) => {
-    res.redirect(`${FRONTEND_URL}/checkout`);
-});
-
-// Proxy
-app.use('/api/auth', createProxyMiddleware({
+// ✅ PROXY CONFIGURACIÓN CORRECTA - USANDO pathRewrite CON OBJETO
+const proxyConfigs = [
+  { 
+    path: '/api/auth', 
     target: 'http://auth-service:3001',
-    changeOrigin: true,
-    pathRewrite: { '^/api/auth': '' }
-}));
-
-app.use('/api/products', createProxyMiddleware({
-    target: 'http://products-service:3002',
-    changeOrigin: true,
-    pathRewrite: { '^/api/products': '' }
-}));
-
-app.use('/api/orders', createProxyMiddleware({
-    target: 'http://orders-service:3003',
-    changeOrigin: true,
-    pathRewrite: { '^/api/orders': '' }
-}));
-
-app.use('/api/users', createProxyMiddleware({
+    rewrite: { '^/api/auth': '' }
+  },
+  { 
+    path: '/api/users', 
     target: 'http://users-service:3004',
-    changeOrigin: true,
-    pathRewrite: { '^/api/users': '' }
-}));
-
-app.use('/api/analytics', createProxyMiddleware({
+    rewrite: { '^/api/users': '' }
+  },
+  { 
+    path: '/api/products', 
+    target: 'http://products-service:3002',
+    rewrite: { '^/api/products': '/products' }  // ✅ Clave: reemplazar /api/products con /products
+  },
+  { 
+    path: '/api/orders', 
+    target: 'http://orders-service:3003',
+    rewrite: { '^/api/orders': '' }
+  },
+  { 
+    path: '/api/analytics', 
     target: 'http://analytics-service:3006',
-    changeOrigin: true,
-    pathRewrite: { '^/api/analytics': '' }
-}));
-
-app.use('/api/notifications', createProxyMiddleware({
+    rewrite: { '^/api/analytics': '' }
+  },
+  { 
+    path: '/api/notifications', 
     target: 'http://notifications-service:3005',
-    changeOrigin: true,
-    pathRewrite: { '^/api/notifications': '' }
-}));
+    rewrite: { '^/api/notifications': '' }
+  },
+  { 
+    path: '/api/inventory', 
+    target: 'http://inventory-service:3007',
+    rewrite: { '^/api/inventory': '' }
+  },
+  { 
+    path: '/api/payment', 
+    target: 'http://payment-service:3008',
+    rewrite: { '^/api/payment': '' }
+  },
+  { 
+    path: '/api/shipping', 
+    target: 'http://shipping-service:3009',
+    rewrite: { '^/api/shipping': '' }
+  },
+  { 
+    path: '/api/reviews', 
+    target: 'http://review-service:3010',
+    rewrite: { '^/api/reviews': '' }
+  },
+  { 
+    path: '/api/wishlist', 
+    target: 'http://wishlist-service:3011',
+    rewrite: { '^/api/wishlist': '' }
+  },
+  { 
+    path: '/api/coupons', 
+    target: 'http://coupon-service:3012',
+    rewrite: { '^/api/coupons': '' }
+  },
+  { 
+    path: '/api/audit', 
+    target: 'http://audit-service:3013',
+    rewrite: { '^/api/audit': '' }
+  }
+];
 
-// 404
-app.use('*', (req, res) => {
-    res.status(404).json({ 
-        error: 'Route not found', 
-        path: req.originalUrl 
-    });
+proxyConfigs.forEach(({ path, target, rewrite }) => {
+  app.use(path, createProxyMiddleware({
+    target,
+    changeOrigin: true,
+    pathRewrite: rewrite,  // ✅ Usar el objeto rewrite
+    logLevel: 'debug',
+    timeout: 30000,
+    proxyTimeout: 30000,
+    onProxyReq: (proxyReq, req, res) => {
+      const newPath = req.url.replace(path, '');
+      console.log(`🔄 Proxying ${req.method} ${req.url} → ${target}${newPath}`);
+      
+      if (req.body && Object.keys(req.body).length > 0) {
+        const bodyData = JSON.stringify(req.body);
+        proxyReq.setHeader('Content-Type', 'application/json');
+        proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
+        proxyReq.write(bodyData);
+      }
+    },
+    onProxyRes: (proxyRes, req, res) => {
+      console.log(`📥 Respuesta de ${target}: ${proxyRes.statusCode}`);
+    },
+    onError: (err, req, res) => {
+      console.error(`❌ Proxy error: ${err.message}`);
+      res.status(503).json({ 
+        error: 'Service unavailable', 
+        message: err.message,
+        service: target
+      });
+    },
+  }));
 });
 
-app.listen(PORT, () => {
-    console.log(`✅ API Gateway running on port ${PORT}`);
-    console.log(`🔄 Redirigiendo rutas de frontend a: ${FRONTEND_URL}`);
+// 404 handler
+app.use('*', (req, res) => {
+  res.status(404).json({
+    error: 'Route not found',
+    path: req.originalUrl
+  });
+});
+
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`✅ API Gateway running on port ${PORT}`);
+  console.log(`🔄 Redirigiendo rutas de frontend a: ${FRONTEND_URL}`);
 });
