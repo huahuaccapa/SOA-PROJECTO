@@ -30,19 +30,18 @@ const Event = mongoose.model('AnalyticsEvent', EventSchema);
 const Metric = mongoose.model('Metric', MetricSchema);
 
 // Conectar a MongoDB
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://mongodb:27017/byteverse')
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://admin:password@mongodb:27017/byteverse?authSource=admin')
   .then(() => console.log('✅ Analytics Service conectado a MongoDB'))
   .catch(err => console.error('❌ Error MongoDB:', err));
 
-// Conectar a RabbitMQ
+// RabbitMQ
 let channel;
 async function connectRabbitMQ() {
   try {
     const connection = await amqp.connect(process.env.RABBITMQ_URL || 'amqp://rabbitmq:5672');
     channel = await connection.createChannel();
     
-    // Consumir eventos
-    const queues = ['auth_events', 'order_events', 'product_events'];
+    const queues = ['auth_events', 'order_events', 'product_events', 'payment_events'];
     for (const queue of queues) {
       await channel.assertQueue(queue);
       channel.consume(queue, async (msg) => {
@@ -68,7 +67,6 @@ async function connectRabbitMQ() {
 async function processEvent(event) {
   console.log(`📊 Evento: ${event.event}`);
   
-  // Guardar evento
   await Event.create({
     event: event.event,
     userId: event.userId,
@@ -77,7 +75,6 @@ async function processEvent(event) {
     timestamp: new Date()
   });
   
-  // Actualizar métricas
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   
@@ -85,12 +82,12 @@ async function processEvent(event) {
     'USER_REGISTERED': 'new_users',
     'USER_LOGIN': 'user_logins',
     'ORDER_CREATED': 'orders_created',
-    'PRODUCT_CREATED': 'products_created'
+    'PRODUCT_CREATED': 'products_created',
+    'PAYMENT_CONFIRMED': 'payments_completed'
   };
   
   const metricName = metricMap[event.event] || 'other_events';
   
-  // Actualizar métrica diaria
   await Metric.findOneAndUpdate(
     { metric: metricName, date: today, period: 'day' },
     { $inc: { value: 1 } },
@@ -98,7 +95,7 @@ async function processEvent(event) {
   );
 }
 
-// Endpoints
+// ENDPOINTS
 app.get('/analytics/events', async (req, res) => {
   try {
     const { limit = 50 } = req.query;
