@@ -16,7 +16,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# RabbitMQ
 rabbitmq_channel = None
 
 async def connect_rabbitmq():
@@ -26,11 +25,9 @@ async def connect_rabbitmq():
             os.getenv("RABBITMQ_URL", "amqp://rabbitmq:5672")
         )
         rabbitmq_channel = await connection.channel()
-        
-        # Declarar colas
         await rabbitmq_channel.declare_queue("auth_events", durable=True)
         await rabbitmq_channel.declare_queue("order_events", durable=True)
-        
+        await rabbitmq_channel.declare_queue("payment_events", durable=True)
         print("✅ Notifications Service conectado a RabbitMQ")
         return rabbitmq_channel
     except Exception as e:
@@ -59,16 +56,15 @@ async def consume_events():
                 elif event_type == "USER_LOGIN":
                     print(f"👤 Usuario logueado: {event_data.get('email')}")
                     
+                elif event_type == "PAYMENT_CONFIRMED":
+                    print(f"💳 Pago confirmado para pedido: {event_data.get('order_id')}")
+                    
             except Exception as e:
                 print(f"❌ Error procesando evento: {e}")
     
-    # Consumir colas
     await rabbitmq_channel.consume(callback, queue="auth_events", no_ack=False)
     await rabbitmq_channel.consume(callback, queue="order_events", no_ack=False)
-
-@app.get("/")
-async def root():
-    return {"service": "Notifications Service", "status": "healthy"}
+    await rabbitmq_channel.consume(callback, queue="payment_events", no_ack=False)
 
 @app.get("/health")
 async def health():
