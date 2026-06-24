@@ -42,29 +42,28 @@ const OrderSchema = new mongoose.Schema({
 const Order = mongoose.model('Order', OrderSchema);
 
 // Conectar a MongoDB
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://mongodb:27017/byteverse')
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://admin:password@mongodb:27017/byteverse?authSource=admin')
   .then(() => console.log('✅ Orders Service conectado a MongoDB'))
   .catch(err => console.error('❌ Error MongoDB:', err));
 
-// Conectar a RabbitMQ
+// RabbitMQ
 let channel;
 async function connectRabbitMQ() {
   try {
     const connection = await amqp.connect(process.env.RABBITMQ_URL || 'amqp://rabbitmq:5672');
     channel = await connection.createChannel();
-    await channel.assertQueue('order_events');
+    await channel.assertQueue('order_events', { durable: true });
     console.log('✅ Orders Service conectado a RabbitMQ');
   } catch (error) {
     console.error('❌ Error RabbitMQ:', error.message);
   }
 }
 
-// Endpoints
+// ENDPOINTS
 app.post('/orders', async (req, res) => {
   try {
     const orderData = req.body;
     
-    // Calcular totales
     const subtotal = orderData.productos.reduce(
       (sum, item) => sum + (item.precio * item.cantidad), 0
     );
@@ -81,17 +80,17 @@ app.post('/orders', async (req, res) => {
     
     await order.save();
     
-    // Publicar evento
     if (channel) {
-      channel.sendToQueue('order_events', Buffer.from(JSON.stringify({
+      await channel.sendToQueue('order_events', Buffer.from(JSON.stringify({
         event: 'ORDER_CREATED',
         id: order.id,
         compradorId: order.compradorId,
         compradorNombre: order.compradorNombre,
         total: order.total,
         estado: order.estado,
+        items: order.productos,
         timestamp: new Date().toISOString()
-      })));
+      })), { persistent: true });
     }
     
     res.status(201).json({ success: true, order });
@@ -104,7 +103,6 @@ app.get('/orders', async (req, res) => {
   try {
     const { userId, vendorId } = req.query;
     let query = {};
-    
     if (userId) query.compradorId = parseInt(userId);
     if (vendorId) query.vendedorId = parseInt(vendorId);
     
@@ -140,14 +138,14 @@ app.put('/orders/:orderId/status', async (req, res) => {
       return res.status(404).json({ error: 'Orden no encontrada' });
     }
     
-    // Publicar evento
     if (channel) {
-      channel.sendToQueue('order_events', Buffer.from(JSON.stringify({
+      await channel.sendToQueue('order_events', Buffer.from(JSON.stringify({
         event: 'ORDER_STATUS_UPDATED',
         id: order.id,
         estado: status,
+        items: order.productos,
         timestamp: new Date().toISOString()
-      })));
+      })), { persistent: true });
     }
     
     res.json({ success: true, order });
@@ -160,7 +158,6 @@ app.get('/health', (req, res) => {
   res.json({ status: 'OK', service: 'orders-service' });
 });
 
-// Iniciar
 connectRabbitMQ().then(() => {
   app.listen(PORT, () => {
     console.log(`✅ Orders Service running on port ${PORT}`);
