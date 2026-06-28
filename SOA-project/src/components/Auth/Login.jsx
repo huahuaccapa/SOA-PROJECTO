@@ -1,4 +1,4 @@
-// Login.jsx
+// src\components\Auth\Login.jsx
 import React, { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
@@ -16,7 +16,7 @@ const Login = () => {
   const [resetCode, setResetCode] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmNewPassword, setConfirmNewPassword] = useState('')
-  const [resetStep, setResetStep] = useState(1) // 1: enviar email, 2: verificar código, 3: nueva contraseña
+  const [resetStep, setResetStep] = useState(1)
   const [generatedCode, setGeneratedCode] = useState('')
   const { login, loginWithGoogle, requestPasswordReset, verifyResetCode, resetPassword } = useAuth()
   const { showSuccess, showError } = useNotification()
@@ -47,7 +47,6 @@ const Login = () => {
     const result = await login(email, password)
     
     if (result.success) {
-      // Verificar si el usuario necesita cambiar contraseña
       if (result.needPasswordChange) {
         showSuccess('Primero debes cambiar tu contraseña por seguridad')
         navigate('/change-password', { state: { userId: result.userId, email: email } })
