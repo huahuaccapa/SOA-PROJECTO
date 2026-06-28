@@ -1,5 +1,5 @@
+//src\contexts\CartContext.jsx
 import React, { createContext, useState, useContext, useEffect } from 'react'
-import { cartService } from '../services/cartService'
 import { useAuth } from './AuthContext'
 
 const CartContext = createContext()
@@ -23,7 +23,7 @@ export const CartProvider = ({ children }) => {
   }, [user?.id])
 
   const loadCart = async () => {
-    if (!user?.id || user?.id === 0) {
+    if (!user?.id || user?.id === 'invitado') {
       // Usuario invitado - usar localStorage
       const savedCart = localStorage.getItem('cart_guest')
       setCart(savedCart ? JSON.parse(savedCart) : [])
@@ -31,15 +31,16 @@ export const CartProvider = ({ children }) => {
     }
 
     setLoading(true)
-    const data = await cartService.getCart(user.id)
-    setCart(data)
+    // Cargar desde localStorage por ahora (backend de cart no está implementado)
+    const savedCart = localStorage.getItem(`cart_${user.id}`)
+    setCart(savedCart ? JSON.parse(savedCart) : [])
     setLoading(false)
   }
 
   // Guardar carrito cuando cambie
   useEffect(() => {
-    if (user?.id && user?.id !== 0) {
-      cartService.saveCart(user.id, cart)
+    if (user?.id && user?.id !== 'invitado') {
+      localStorage.setItem(`cart_${user.id}`, JSON.stringify(cart))
     } else {
       localStorage.setItem('cart_guest', JSON.stringify(cart))
     }
