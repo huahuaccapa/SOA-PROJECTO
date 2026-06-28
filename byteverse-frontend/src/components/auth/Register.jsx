@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { EnvelopeIcon, LockClosedIcon, UserIcon } from '@heroicons/react/24/outline';
+import toast from 'react-hot-toast';
 
 const Register = () => {
   const navigate = useNavigate();
@@ -12,7 +13,6 @@ const Register = () => {
     email: '',
     password: '',
     confirmPassword: '',
-    role: 'COMPRADOR'
   });
 
   const handleChange = (e) => {
@@ -26,16 +26,27 @@ const Register = () => {
     e.preventDefault();
     
     if (formData.password !== formData.confirmPassword) {
-      alert('Las contraseñas no coinciden');
+      toast.error('Las contraseñas no coinciden');
+      return;
+    }
+    
+    if (formData.password.length < 6) {
+      toast.error('La contraseña debe tener al menos 6 caracteres');
       return;
     }
     
     setLoading(true);
     
-    const { confirmPassword, ...registerData } = formData;
-    const result = await register(registerData);
+    // ✅ Siempre COMPRADOR
+    const registerData = {
+      ...formData,
+      role: 'COMPRADOR'
+    };
+    const { confirmPassword, ...finalData } = registerData;
+    const result = await register(finalData);
     
     if (result.success) {
+      toast.success('¡Registro exitoso! Ahora puedes iniciar sesión');
       navigate('/login');
     }
     
@@ -50,13 +61,13 @@ const Register = () => {
             <span className="text-white font-bold text-2xl">B</span>
           </div>
           <h2 className="text-3xl font-bold text-gray-900">Crear Cuenta</h2>
-          <p className="text-gray-600 mt-2">Únete a ByteVerse y comienza a comprar</p>
+          <p className="text-gray-600 mt-2">Únete a ByteVerse como comprador</p>
         </div>
         
         <form onSubmit={handleSubmit} className="mt-8 space-y-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Nombre Completo
+              Nombre Completo *
             </label>
             <div className="relative">
               <UserIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -74,7 +85,7 @@ const Register = () => {
           
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Correo Electrónico
+              Correo Electrónico *
             </label>
             <div className="relative">
               <EnvelopeIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -92,7 +103,7 @@ const Register = () => {
           
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Contraseña
+              Contraseña *
             </label>
             <div className="relative">
               <LockClosedIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -103,7 +114,7 @@ const Register = () => {
                 onChange={handleChange}
                 required
                 className="input-field pl-10"
-                placeholder="••••••••"
+                placeholder="Mínimo 6 caracteres"
                 minLength="6"
               />
             </div>
@@ -111,7 +122,7 @@ const Register = () => {
           
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Confirmar Contraseña
+              Confirmar Contraseña *
             </label>
             <div className="relative">
               <LockClosedIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -122,24 +133,14 @@ const Register = () => {
                 onChange={handleChange}
                 required
                 className="input-field pl-10"
-                placeholder="••••••••"
+                placeholder="Confirma tu contraseña"
               />
             </div>
           </div>
           
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Tipo de Usuario
-            </label>
-            <select
-              name="role"
-              value={formData.role}
-              onChange={handleChange}
-              className="input-field"
-            >
-              <option value="COMPRADOR">Comprador</option>
-              <option value="VENDEDOR">Vendedor</option>
-            </select>
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-700">
+            💡 Al registrarte, tu cuenta será de tipo <strong>Comprador</strong>. 
+            Si deseas ser vendedor, contacta al administrador.
           </div>
           
           <button

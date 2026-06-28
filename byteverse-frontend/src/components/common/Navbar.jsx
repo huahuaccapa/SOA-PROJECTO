@@ -14,6 +14,8 @@ import {
   ClipboardDocumentListIcon,
   Cog6ToothIcon,
   ArrowRightOnRectangleIcon,
+  UserGroupIcon,
+  CurrencyDollarIcon,
 } from '@heroicons/react/24/outline';
 import { Menu, Transition } from '@headlessui/react';
 import toast from 'react-hot-toast';
@@ -23,6 +25,9 @@ const Navbar = () => {
   const { totalItems } = useCart();
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // ✅ Check if user can buy (not admin)
+  const canBuy = isAuthenticated && !isAdmin();
 
   const handleLogout = () => {
     logout();
@@ -34,7 +39,13 @@ const Navbar = () => {
       return [
         { name: 'Dashboard', path: '/admin', icon: ChartBarIcon },
         { name: 'Usuarios', path: '/admin/users', icon: UsersIcon },
+        { name: 'Vendedores', path: '/admin/vendors', icon: UserGroupIcon },
         { name: 'Productos', path: '/admin/products', icon: ShoppingBagIcon },
+        { name: 'Pedidos', path: '/admin/orders', icon: ClipboardDocumentListIcon },
+        { name: 'Categorías', path: '/admin/categories', icon: Cog6ToothIcon },
+        { name: 'Ingresos', path: '/admin/revenue', icon: CurrencyDollarIcon },
+        { name: 'Analytics', path: '/admin/analytics', icon: ChartBarIcon },
+        { name: 'Perfil', path: '/admin/profile', icon: UserIcon },
       ];
     }
     if (isVendor()) {
@@ -94,24 +105,36 @@ const Navbar = () => {
               </Link>
             ))}
 
-            {/* Cart */}
-            <Link to="/cart" className="relative px-3 py-2 rounded-lg text-gray-700 hover:text-primary-600 hover:bg-primary-50 transition-all duration-200">
-              <ShoppingCartIcon className="w-6 h-6" />
-              {totalItems > 0 && (
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">
-                  {totalItems}
-                </span>
-              )}
-            </Link>
+            {/* ✅ Cart - Solo visible para compradores y vendedores, NO para admin */}
+            {canBuy && (
+              <Link to="/cart" className="relative px-3 py-2 rounded-lg text-gray-700 hover:text-primary-600 hover:bg-primary-50 transition-all duration-200">
+                <ShoppingCartIcon className="w-6 h-6" />
+                {totalItems > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">
+                    {totalItems}
+                  </span>
+                )}
+              </Link>
+            )}
 
             {/* Auth Buttons */}
             {isAuthenticated ? (
               <Menu as="div" className="relative">
                 <Menu.Button className="flex items-center space-x-2 px-3 py-2 rounded-lg hover:bg-primary-50 transition-all duration-200">
-                  <div className="w-8 h-8 bg-gradient-to-r from-primary-500 to-secondary-500 rounded-full flex items-center justify-center text-white font-semibold">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-semibold ${
+                    isAdmin() ? 'bg-gradient-to-r from-red-500 to-red-600' :
+                    isVendor() ? 'bg-gradient-to-r from-blue-500 to-blue-600' :
+                    'bg-gradient-to-r from-primary-500 to-secondary-500'
+                  }`}>
                     {user?.nombre?.charAt(0).toUpperCase() || 'U'}
                   </div>
                   <span className="text-sm font-medium text-gray-700">{user?.nombre}</span>
+                  {isAdmin() && (
+                    <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">Admin</span>
+                  )}
+                  {isVendor() && (
+                    <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Vendedor</span>
+                  )}
                 </Menu.Button>
                 <Transition
                   enter="transition duration-100 ease-out"
@@ -158,14 +181,17 @@ const Navbar = () => {
 
           {/* Mobile menu button */}
           <div className="flex items-center md:hidden">
-            <Link to="/cart" className="relative p-2 text-gray-700 hover:text-primary-600">
-              <ShoppingCartIcon className="w-6 h-6" />
-              {totalItems > 0 && (
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">
-                  {totalItems}
-                </span>
-              )}
-            </Link>
+            {/* ✅ Cart mobile - Solo para no admin */}
+            {canBuy && (
+              <Link to="/cart" className="relative p-2 text-gray-700 hover:text-primary-600">
+                <ShoppingCartIcon className="w-6 h-6" />
+                {totalItems > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">
+                    {totalItems}
+                  </span>
+                )}
+              </Link>
+            )}
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               className="p-2 rounded-lg text-gray-700 hover:text-primary-600 hover:bg-primary-50 transition-all duration-200"

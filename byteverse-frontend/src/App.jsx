@@ -1,23 +1,37 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/common/ProtectedRoute';
+
+// ✅ COMPONENTES PÚBLICOS
 import Navbar from './components/common/Navbar';
 import Footer from './components/common/Footer';
-
-// Pages
 import Home from './components/visitor/Home';
 import Products from './components/visitor/Products';
 import ProductDetail from './components/visitor/ProductDetail';
 import Login from './components/auth/Login';
 import Register from './components/auth/Register';
+import NotFound from './components/common/NotFound';
+
+// ✅ COMPONENTES COMPRADOR
 import Cart from './components/buyer/Cart';
 import Checkout from './components/buyer/Checkout';
 import Orders from './components/buyer/Orders';
+
+// ✅ COMPONENTES VENDEDOR
 import VendorDashboard from './components/vendor/VendorDashboard';
+
+// ✅ COMPONENTES ADMIN
 import AdminDashboard from './components/admin/AdminDashboard';
-import NotFound from './components/common/NotFound';
+import AdminUsers from './components/admin/AdminUsers';
+import AdminProducts from './components/admin/AdminProducts';
+import AdminOrders from './components/admin/AdminOrders';
+import AdminVendors from './components/admin/AdminVendors';
+import AdminCategories from './components/admin/AdminCategories';
+import AdminProfile from './components/admin/AdminProfile';
+import AdminRevenue from './components/admin/AdminRevenue';
+import AdminAnalytics from './components/admin/AdminAnalytics';
 
 function App() {
   return (
@@ -27,54 +41,38 @@ function App() {
           <Navbar />
           <main className="flex-grow">
             <Routes>
-              {/* Public Routes */}
+              {/* ✅ RUTAS PÚBLICAS */}
               <Route path="/" element={<Home />} />
               <Route path="/products" element={<Products />} />
               <Route path="/product/:id" element={<ProductDetail />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               
-              {/* Buyer Routes */}
+              {/* ✅ RUTAS COMPRADOR (Excluir Admin) */}
               <Route path="/cart" element={
-                <ProtectedRoute>
+                <ProtectedRoute excludeRoles={['ADMIN']}>
                   <Cart />
                 </ProtectedRoute>
               } />
               <Route path="/checkout" element={
-                <ProtectedRoute>
+                <ProtectedRoute excludeRoles={['ADMIN']}>
                   <Checkout />
                 </ProtectedRoute>
               } />
               <Route path="/orders" element={
-                <ProtectedRoute>
+                <ProtectedRoute excludeRoles={['ADMIN']}>
                   <Orders />
                 </ProtectedRoute>
               } />
               
-              {/* Vendor Routes */}
+              {/* ✅ RUTAS VENDEDOR */}
               <Route path="/vendor" element={
                 <ProtectedRoute roles={['VENDEDOR', 'ADMIN']}>
                   <VendorDashboard />
                 </ProtectedRoute>
               } />
-              <Route path="/vendor/products" element={
-                <ProtectedRoute roles={['VENDEDOR', 'ADMIN']}>
-                  <div className="p-8 text-center">
-                    <h2 className="text-2xl font-bold">Mis Productos</h2>
-                    <p className="text-gray-600 mt-2">Aquí gestionas tus productos</p>
-                  </div>
-                </ProtectedRoute>
-              } />
-              <Route path="/vendor/orders" element={
-                <ProtectedRoute roles={['VENDEDOR', 'ADMIN']}>
-                  <div className="p-8 text-center">
-                    <h2 className="text-2xl font-bold">Pedidos</h2>
-                    <p className="text-gray-600 mt-2">Aquí ves los pedidos de tus productos</p>
-                  </div>
-                </ProtectedRoute>
-              } />
               
-              {/* Admin Routes */}
+              {/* ✅ RUTAS ADMIN */}
               <Route path="/admin" element={
                 <ProtectedRoute roles={['ADMIN']}>
                   <AdminDashboard />
@@ -82,63 +80,53 @@ function App() {
               } />
               <Route path="/admin/users" element={
                 <ProtectedRoute roles={['ADMIN']}>
-                  <div className="p-8 text-center">
-                    <h2 className="text-2xl font-bold">Gestionar Usuarios</h2>
-                    <p className="text-gray-600 mt-2">Administración de usuarios del sistema</p>
-                  </div>
+                  <AdminUsers />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/vendors" element={
+                <ProtectedRoute roles={['ADMIN']}>
+                  <AdminVendors />
                 </ProtectedRoute>
               } />
               <Route path="/admin/products" element={
                 <ProtectedRoute roles={['ADMIN']}>
-                  <div className="p-8 text-center">
-                    <h2 className="text-2xl font-bold">Gestionar Productos</h2>
-                    <p className="text-gray-600 mt-2">Administración de productos</p>
-                  </div>
+                  <AdminProducts />
                 </ProtectedRoute>
               } />
               <Route path="/admin/orders" element={
                 <ProtectedRoute roles={['ADMIN']}>
-                  <div className="p-8 text-center">
-                    <h2 className="text-2xl font-bold">Pedidos</h2>
-                    <p className="text-gray-600 mt-2">Todos los pedidos del sistema</p>
-                  </div>
+                  <AdminOrders />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/categories" element={
+                <ProtectedRoute roles={['ADMIN']}>
+                  <AdminCategories />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/profile" element={
+                <ProtectedRoute roles={['ADMIN']}>
+                  <AdminProfile />
+                </ProtectedRoute>
+              } />
+              {/* ✅ NUEVAS RUTAS ADMIN */}
+              <Route path="/admin/revenue" element={
+                <ProtectedRoute roles={['ADMIN']}>
+                  <AdminRevenue />
                 </ProtectedRoute>
               } />
               <Route path="/admin/analytics" element={
                 <ProtectedRoute roles={['ADMIN']}>
-                  <div className="p-8 text-center">
-                    <h2 className="text-2xl font-bold">Analytics</h2>
-                    <p className="text-gray-600 mt-2">Métricas y estadísticas del sistema</p>
-                  </div>
+                  <AdminAnalytics />
                 </ProtectedRoute>
               } />
               
-              {/* 404 */}
+              {/* ✅ 404 */}
               <Route path="*" element={<NotFound />} />
             </Routes>
           </main>
           <Footer />
         </div>
-        <Toaster 
-          position="top-right"
-          toastOptions={{
-            duration: 4000,
-            style: {
-              background: '#363636',
-              color: '#fff',
-            },
-            success: {
-              style: {
-                background: '#22c55e',
-              },
-            },
-            error: {
-              style: {
-                background: '#ef4444',
-              },
-            },
-          }}
-        />
+        <Toaster position="top-right" />
       </AuthProvider>
     </BrowserRouter>
   );

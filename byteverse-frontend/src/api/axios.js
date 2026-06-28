@@ -19,6 +19,7 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    console.log(`🚀 ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
     return config;
   },
   (error) => {
@@ -28,10 +29,14 @@ api.interceptors.request.use(
 
 // Interceptor para manejar errores
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    console.log(`✅ ${response.status} ${response.config.url}`);
+    return response;
+  },
   async (error) => {
     const originalRequest = error.config;
 
+    // ✅ Manejar error 401 (token expirado)
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
       try {
@@ -47,7 +52,6 @@ api.interceptors.response.use(
           return api(originalRequest);
         }
       } catch (refreshError) {
-        // Si falla el refresh, redirigir al login
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
@@ -56,9 +60,15 @@ api.interceptors.response.use(
       }
     }
 
-    // Mostrar errores al usuario
-    const message = error.response?.data?.error || error.message || 'Error en la petición';
-    toast.error(message);
+    // ✅ No mostrar error para 404 si ya estamos manejando
+    if (error.response?.status !== 404) {
+      const message = error.response?.data?.error || 
+                      error.response?.data?.message || 
+                      error.message || 
+                      'Error en la petición';
+      toast.error(message);
+    }
+    
     return Promise.reject(error);
   }
 );

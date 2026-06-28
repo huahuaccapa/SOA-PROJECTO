@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
-import { EyeIcon } from '@heroicons/react/24/outline';
+import { EyeIcon, XMarkIcon, CheckIcon } from '@heroicons/react/24/outline';
+import toast from 'react-hot-toast';
 
 const Orders = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedOrder, setSelectedOrder] = useState(null);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -14,10 +16,14 @@ const Orders = () => {
 
   const fetchOrders = async () => {
     try {
+      setLoading(true);
+      // ✅ Usar userId para filtrar
       const response = await api.get(`/orders?userId=${user.id}`);
+      console.log('📦 Órdenes recibidas:', response.data);
       setOrders(response.data);
     } catch (error) {
-      console.error('Error fetching orders:', error);
+      console.error('❌ Error fetching orders:', error);
+      toast.error('Error al cargar tus pedidos');
     } finally {
       setLoading(false);
     }
@@ -27,9 +33,35 @@ const Orders = () => {
     const colors = {
       'PENDIENTE': 'badge-warning',
       'CONFIRMADO': 'badge-success',
+      'ENVIADO': 'badge-info',
+      'ENTREGADO': 'badge-success',
       'CANCELADO': 'badge-danger'
     };
     return colors[status] || 'badge-info';
+  };
+
+  const getStatusText = (status) => {
+    const texts = {
+      'PENDIENTE': '⏳ Pendiente',
+      'CONFIRMADO': '✅ Confirmado',
+      'ENVIADO': '🚚 Enviado',
+      'ENTREGADO': '📦 Entregado',
+      'CANCELADO': '❌ Cancelado'
+    };
+    return texts[status] || status;
+  };
+
+  const handleCancelOrder = async (orderId) => {
+    if (!confirm('¿Estás seguro de cancelar este pedido?')) return;
+    
+    try {
+      await api.delete(`/orders/${orderId}`);
+      toast.success('Pedido cancelado');
+      fetchOrders();
+    } catch (error) {
+      console.error('❌ Error cancelando orden:', error);
+      toast.error('Error al cancelar el pedido');
+    }
   };
 
   if (loading) {
@@ -50,21 +82,32 @@ const Orders = () => {
             <div className="text-6xl mb-6">📦</div>
             <h2 className="text-2xl font-bold text-gray-900 mb-4">No tienes pedidos</h2>
             <p className="text-gray-600 mb-8">Realiza tu primera compra y revisa tus pedidos aquí</p>
+            <a href="/products" className="btn-primary inline-block">
+              Ver Productos
+            </a>
           </div>
         ) : (
           <div className="space-y-6">
             {orders.map((order) => (
-              <div key={order.id} className="bg-white rounded-2xl shadow-xl overflow-hidden">
+              <div key={order.id || order._id} className="bg-white rounded-2xl shadow-xl overflow-hidden">
                 <div className="p-6">
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
                     <div>
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 flex-wrap">
                         <h3 className="text-lg font-bold text-gray-900">
                           Pedido #{order.id?.slice(0, 8) || order._id?.slice(0, 8)}
                         </h3>
                         <span className={`badge ${getStatusColor(order.estado)}`}>
-                          {order.estado}
+                          {getStatusText(order.estado)}
                         </span>
+                        {order.estado === 'PENDIENTE' && (
+                          <button
+                            onClick={() => handleCancelOrder(order.id)}
+                            className="text-red-600 hover:text-red-800 text-sm font-medium"
+                          >
+                            Cancelar
+                          </button>
+                        )}
                       </div>
                       <p className="text-sm text-gray-500 mt-1">
                         {new Date(order.fecha).toLocaleDateString('es-ES', {
@@ -78,7 +121,7 @@ const Orders = () => {
                     </div>
                     <div className="text-right">
                       <p className="text-2xl font-bold text-primary-600">
-                        S/ {order.total.toFixed(2)}
+                        S/ {order.total?.toFixed(2) || '0.00'}
                       </p>
                       {order.boletaNumero && (
                         <p className="text-xs text-gray-500">Boleta: {order.boletaNumero}</p>
@@ -96,7 +139,7 @@ const Orders = () => {
                           <div>
                             <p className="font-medium text-gray-900">{item.nombre}</p>
                             <p className="text-sm text-gray-500">
-                              {item.cantidad} × S/ {item.precio.toFixed(2)}
+                              {item.cantidad} × S/ {item.precio?.toFixed(2) || '0.00'}
                             </p>
                           </div>
                         </div>
@@ -105,13 +148,20 @@ const Orders = () => {
                   </div>
                   
                   <div className="mt-4 flex flex-wrap gap-3">
-                    <button className="btn-secondary text-sm px-4 py-2 flex items-center gap-2">
+                    <button
+                      onClick={() => setSelectedOrder(order)}
+                      className="btn-secondary text-sm px-4 py-2 flex items-center gap-2"
+                    >
                       <EyeIcon className="w-4 h-4" />
                       Ver Detalle
                     </button>
                     {order.estado === 'PENDIENTE' && (
-                      <button className="btn-danger text-sm px-4 py-2">
-                        Cancelar Pedido
+                      <button
+                        onClick={() => handleCancelOrder(order.id)}
+                        className="btn-danger text-sm px-4 py-2 flex items-center gap-2"
+                      >
+                        <XMarkIcon className="w-4 h-4" />
+                        Cancelar
                       </button>
                     )}
                   </div>
@@ -121,6 +171,83 @@ const Orders = () => {
           </div>
         )}
       </div>
+
+      {/* Modal de detalle */}
+      {selectedOrder && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6">
+            <div className="flex justify-between items-start mb-4">
+              <h2 className="text-2xl font-bold">Detalle del Pedido</h2>
+              <button
+                onClick={() => setSelectedOrder(null)}
+                className="p-2 hover:bg-gray-100 rounded-lg"
+              >
+                <XMarkIcon className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-gray-500">Número</p>
+                  <p className="font-medium">{selectedOrder.id?.slice(0, 8)}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Estado</p>
+                  <span className={`badge ${getStatusColor(selectedOrder.estado)}`}>
+                    {getStatusText(selectedOrder.estado)}
+                  </span>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Fecha</p>
+                  <p className="font-medium">
+                    {new Date(selectedOrder.fecha).toLocaleDateString('es-ES')}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Boleta</p>
+                  <p className="font-medium">{selectedOrder.boletaNumero || 'N/A'}</p>
+                </div>
+              </div>
+              
+              <div className="border-t border-gray-200 pt-4">
+                <h3 className="font-semibold mb-2">Productos</h3>
+                <div className="space-y-2">
+                  {selectedOrder.productos?.map((item, index) => (
+                    <div key={index} className="flex justify-between text-sm">
+                      <span>{item.nombre} × {item.cantidad}</span>
+                      <span>S/ {(item.precio * item.cantidad).toFixed(2)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              
+              <div className="border-t border-gray-200 pt-4">
+                <div className="flex justify-between">
+                  <span>Subtotal</span>
+                  <span>S/ {selectedOrder.subtotal?.toFixed(2) || '0.00'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>IGV (18%)</span>
+                  <span>S/ {selectedOrder.igv?.toFixed(2) || '0.00'}</span>
+                </div>
+                <div className="flex justify-between text-xl font-bold">
+                  <span>Total</span>
+                  <span className="text-primary-600">S/ {selectedOrder.total?.toFixed(2) || '0.00'}</span>
+                </div>
+              </div>
+              
+              {selectedOrder.direccion && (
+                <div className="border-t border-gray-200 pt-4">
+                  <h3 className="font-semibold mb-1">Dirección de Envío</h3>
+                  <p className="text-gray-600">{selectedOrder.direccion}</p>
+                  <p className="text-gray-600">{selectedOrder.ciudad}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

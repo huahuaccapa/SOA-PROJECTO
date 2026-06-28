@@ -17,6 +17,7 @@ const Checkout = () => {
     notas: ''
   });
 
+  // ✅ Redirigir si carrito vacío
   if (cart.length === 0) {
     navigate('/cart');
     return null;
@@ -29,16 +30,31 @@ const Checkout = () => {
     });
   };
 
+  // ✅ ENVIAR PEDIDO - ACTUALIZADO
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
 
     try {
+      // ✅ Obtener vendedorId del primer producto (todos deberían tener el mismo)
+      const firstProduct = cart[0];
+      const vendedorId = firstProduct?.vendedorId || '';
+      const vendedorNombre = firstProduct?.vendedorNombre || 'ByteVerse Store';
+
+      // ✅ Verificar que todos los productos tengan el mismo vendedor
+      const differentVendors = cart.some(item => item.vendedorId !== vendedorId);
+      if (differentVendors) {
+        toast.error('No se pueden comprar productos de diferentes vendedores en un mismo pedido');
+        setLoading(false);
+        return;
+      }
+
+      // ✅ Construir datos de la orden
       const orderData = {
-        compradorId: user.id,
-        compradorNombre: user.nombre,
-        vendedorId: 3,
-        vendedorNombre: 'ByteVerse Store',
+        compradorId: user.id,  // ✅ String (ObjectId)
+        compradorNombre: user.nombre || 'Usuario',
+        vendedorId: vendedorId || '67a1b2c3d4e5f67890abcdef',  // ✅ String
+        vendedorNombre: vendedorNombre || 'ByteVerse Store',
         productos: cart.map(item => ({
           productoId: item.productId,
           nombre: item.nombre,
@@ -47,8 +63,11 @@ const Checkout = () => {
         })),
         metodoPago: formData.metodoPago,
         direccion: formData.direccion,
-        ciudad: formData.ciudad
+        ciudad: formData.ciudad,
+        notas: formData.notas
       };
+
+      console.log('📦 Enviando orden:', orderData);
 
       const response = await api.post('/orders', orderData);
       
@@ -56,14 +75,22 @@ const Checkout = () => {
         toast.success('¡Pedido realizado con éxito!');
         clearCart();
         navigate('/orders');
+      } else {
+        toast.error(response.data.error || 'Error al procesar el pedido');
       }
     } catch (error) {
-      console.error('Error creating order:', error);
-      toast.error('Error al procesar el pedido');
+      console.error('❌ Error creating order:', error);
+      const errorMsg = error.response?.data?.error || error.message || 'Error al procesar el pedido';
+      toast.error(errorMsg);
     } finally {
       setLoading(false);
     }
   };
+
+  // ✅ Calcular totales
+  const subtotal = totalPrice;
+  const igv = subtotal * 0.18;
+  const total = subtotal + igv;
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -71,7 +98,7 @@ const Checkout = () => {
         <h1 className="text-3xl font-bold text-gray-900 mb-8">Checkout</h1>
         
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Form */}
+          {/* Formulario */}
           <div className="lg:col-span-2">
             <div className="bg-white rounded-2xl shadow-xl p-6">
               <h2 className="text-xl font-bold text-gray-900 mb-6">Información de Envío</h2>
@@ -144,12 +171,12 @@ const Checkout = () => {
             </div>
           </div>
 
-          {/* Order Summary */}
+          {/* Resumen de la orden */}
           <div className="lg:col-span-1">
             <div className="bg-white rounded-2xl shadow-xl p-6 sticky top-24">
               <h2 className="text-xl font-bold text-gray-900 mb-6">Resumen</h2>
               
-              <div className="space-y-4 max-h-60 overflow-y-auto">
+              <div className="space-y-3 max-h-60 overflow-y-auto">
                 {cart.map((item) => (
                   <div key={item.productId} className="flex justify-between text-sm">
                     <span className="text-gray-600">
@@ -165,15 +192,15 @@ const Checkout = () => {
               <div className="border-t border-gray-200 mt-4 pt-4 space-y-2">
                 <div className="flex justify-between text-gray-600">
                   <span>Subtotal</span>
-                  <span>S/ {totalPrice.toFixed(2)}</span>
+                  <span>S/ {subtotal.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-gray-600">
                   <span>IGV (18%)</span>
-                  <span>S/ {(totalPrice * 0.18).toFixed(2)}</span>
+                  <span>S/ {igv.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-xl font-bold text-gray-900 pt-2 border-t border-gray-200">
                   <span>Total</span>
-                  <span className="text-primary-600">S/ {(totalPrice * 1.18).toFixed(2)}</span>
+                  <span className="text-primary-600">S/ {total.toFixed(2)}</span>
                 </div>
               </div>
               

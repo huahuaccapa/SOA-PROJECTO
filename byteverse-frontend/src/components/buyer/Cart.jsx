@@ -40,7 +40,6 @@ const Cart = () => {
         <h1 className="text-3xl font-bold text-gray-900 mb-8">Carrito de Compras</h1>
         
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Cart Items */}
           <div className="lg:col-span-2">
             <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
               <div className="p-6">
@@ -73,7 +72,7 @@ const Cart = () => {
                         <button
                           onClick={() => updateQuantity(item.productId, item.cantidad + 1)}
                           className="px-3 py-1 text-gray-600 hover:bg-gray-100 rounded-r-lg transition-colors"
-                          disabled={item.cantidad >= item.stock}
+                          disabled={item.cantidad >= (item.stock || 999)}
                         >
                           <PlusIcon className="w-4 h-4" />
                         </button>
@@ -92,7 +91,6 @@ const Cart = () => {
             </div>
           </div>
 
-          {/* Summary */}
           <div className="lg:col-span-1">
             <div className="bg-white rounded-2xl shadow-xl p-6 sticky top-24">
               <h2 className="text-xl font-bold text-gray-900 mb-6">Resumen del Pedido</h2>

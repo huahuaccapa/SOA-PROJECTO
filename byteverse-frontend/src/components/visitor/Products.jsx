@@ -26,12 +26,14 @@ const Products = () => {
     try {
       setLoading(true);
       const url = selectedCategory 
-        ? `/products?categoria=${selectedCategory}` 
+        ? `/products?categoria=${encodeURIComponent(selectedCategory)}` 
         : '/products';
+      console.log('📦 Fetching products:', url);
       const response = await api.get(url);
+      console.log('✅ Productos recibidos:', response.data.length);
       setProducts(response.data);
     } catch (error) {
-      console.error('Error fetching products:', error);
+      console.error('❌ Error fetching products:', error);
       toast.error('Error al cargar productos');
     } finally {
       setLoading(false);
@@ -41,24 +43,35 @@ const Products = () => {
   const fetchCategories = async () => {
     try {
       const response = await api.get('/products');
-      const uniqueCategories = [...new Set(response.data.map(p => p.categoria))];
+      const uniqueCategories = [...new Set(response.data.map(p => p.categoria).filter(Boolean))];
       setCategories(uniqueCategories);
     } catch (error) {
       console.error('Error fetching categories:', error);
     }
   };
 
+  // ✅ AGREGAR AL CARRITO - ACTUALIZADO
   const handleAddToCart = (product) => {
     if (!isAuthenticated) {
       toast.error('Inicia sesión para agregar al carrito');
       return;
     }
-    addToCart(product);
+
+    // ✅ Asegurar que el producto tenga todos los campos necesarios
+    const productData = {
+      ...product,
+      _id: product._id || product.id,
+      vendedorId: product.vendedorId || '',
+      vendedorNombre: product.vendedorNombre || '',
+      stock: product.stock || 0
+    };
+
+    addToCart(productData);
   };
 
   const filteredProducts = products.filter(product => {
-    const matchesSearch = product.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          product.descripcion.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = (product.nombre || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          (product.descripcion || '').toLowerCase().includes(searchTerm.toLowerCase());
     return matchesSearch;
   });
 
@@ -132,15 +145,15 @@ const Products = () => {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {filteredProducts.map((product) => (
-              <div key={product._id} className="card group">
+              <div key={product._id || product.id} className="card group">
                 <div className="relative overflow-hidden">
                   <img
                     src={product.imagen || 'https://via.placeholder.com/300x200?text=Producto'}
-                    alt={product.nombre}
+                    alt={product.nombre || 'Producto'}
                     className="w-full h-56 object-cover group-hover:scale-110 transition-transform duration-300"
                   />
                   <div className="absolute top-2 right-2 bg-primary-600 text-white px-2 py-1 rounded-lg text-xs font-semibold">
-                    {product.categoria}
+                    {product.categoria || 'General'}
                   </div>
                   {product.stock === 0 && (
                     <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
@@ -150,17 +163,17 @@ const Products = () => {
                 </div>
                 
                 <div className="p-4">
-                  <Link to={`/product/${product._id}`}>
+                  <Link to={`/product/${product._id || product.id}`}>
                     <h3 className="font-semibold text-lg mb-1 hover:text-primary-600 transition-colors line-clamp-1">
-                      {product.nombre}
+                      {product.nombre || 'Producto'}
                     </h3>
                   </Link>
-                  <p className="text-gray-600 text-sm mb-3 line-clamp-2">{product.descripcion}</p>
+                  <p className="text-gray-600 text-sm mb-3 line-clamp-2">{product.descripcion || ''}</p>
                   
                   <div className="flex items-center justify-between">
                     <div>
                       <span className="text-2xl font-bold text-primary-600">
-                        S/ {product.precio.toFixed(2)}
+                        S/ {(product.precio || 0).toFixed(2)}
                       </span>
                       {product.tieneIGV && (
                         <span className="text-xs text-gray-500 ml-1">+IGV</span>
