@@ -1,4 +1,4 @@
-// src/pages/ProductsPage.jsx
+// src\pages\ProductsPage.jsx
 import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom' // ← IMPORTANTE: importar Link
 import { productService } from '../services/productService'
