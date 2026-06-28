@@ -1,4 +1,4 @@
-// ProtectedRoute.jsx - Componente para proteger rutas según el rol del usuario, redirigiendo a login si no está autenticado o no tiene el rol adecuado
+//src\components\Layout\ProtectedRoute.jsx
 import React from 'react'
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
@@ -16,7 +16,6 @@ const ProtectedRoute = ({ children, allowedRoles = [] }) => {
 
   // Si es invitado y la ruta requiere autenticación, redirigir a login
   if (isInvitado && allowedRoles.length > 0) {
-    // Guardar la ruta a la que quería acceder
     sessionStorage.setItem('redirectAfterLogin', window.location.pathname)
     return <Navigate to="/login" replace />
   }
