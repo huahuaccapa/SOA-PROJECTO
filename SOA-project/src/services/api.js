@@ -1,4 +1,4 @@
-// frontend/src/services/api.js
+// src\services\api.js
 import axios from 'axios'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api'
@@ -15,18 +15,17 @@ const api = axios.create({
   withCredentials: false,
 })
 
-// Log para depuración
 console.log('🔗 API URL:', API_URL)
 console.log('🔗 FRONTEND URL:', FRONTEND_URL)
 
-// Interceptor para añadir token JWT a todas las peticiones
+// Interceptor para añadir token JWT
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('jwt')
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
-    console.log(`📤 ${config.method?.toUpperCase()} ${config.url}`, config.data || '')
+    console.log(`📤 ${config.method?.toUpperCase()} ${config.url}`)
     return config
   },
   (error) => {
@@ -35,32 +34,27 @@ api.interceptors.request.use(
   }
 )
 
-// ✅ INTERCEPTOR CORREGIDO - Redirige al FRONTEND correctamente
+// Interceptor para manejar respuestas
 api.interceptors.response.use(
   (response) => {
-    console.log(`📥 ${response.status} ${response.config.url}`, response.data)
+    console.log(`📥 ${response.status} ${response.config.url}`)
     return response
   },
   (error) => {
-    // Manejar errores de autenticación (401)
     if (error.response?.status === 401) {
       console.warn('🔒 Token expirado o inválido')
       localStorage.removeItem('jwt')
       localStorage.removeItem('user')
-      
-      // ✅ CORREGIDO: Redirigir al FRONTEND, no al backend
       if (!window.location.pathname.includes('/login')) {
-        // Usar la URL completa del frontend
         window.location.href = `${FRONTEND_URL}/login`
       }
     }
     
-    // Manejar errores de red
     if (!error.response) {
       console.error('❌ Error de red:', error.message)
       return Promise.reject({ 
         success: false, 
-        error: 'Error de conexión con el servidor. ¿Está el backend corriendo en el puerto 3000?' 
+        error: 'Error de conexión con el servidor' 
       })
     }
     
