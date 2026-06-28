@@ -1,4 +1,4 @@
-// ProductDetailPage.jsx - Página de detalle del producto con información completa, selector de cantidad y productos relacionados
+// src\pages\ProductDetailPage.jsx
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useCart } from '../contexts/CartContext'
