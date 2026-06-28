@@ -1,3 +1,4 @@
+//api-gateway\index.js
 const express = require('express');
 const cors = require('cors');
 const { createProxyMiddleware } = require('http-proxy-middleware');
