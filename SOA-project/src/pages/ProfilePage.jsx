@@ -1,4 +1,4 @@
-// ProfilePage.jsx - Página de perfil del usuario con información personal, dirección de envío y resumen de compras
+//src\pages\ProfilePage.jsx
 import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
