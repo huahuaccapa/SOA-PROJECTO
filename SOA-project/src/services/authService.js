@@ -1,52 +1,64 @@
+//src\services\authService.js
 import api from './api'
 
 export const authService = {
-  // Login de usuario
   async login(credentials) {
     try {
       console.log('🔐 Intentando login:', credentials.email)
       const response = await api.post('/auth/login', credentials)
-      console.log('✅ Login exitoso:', response.data)
-      return response.data
+      
+      // Normalizar respuesta del backend
+      const data = response.data
+      return {
+        success: data.success || false,
+        token: data.accessToken || data.token,
+        refreshToken: data.refreshToken,
+        user: data.user ? {
+          id: data.user.id || data.user._id,
+          nombre: data.user.nombre || data.user.name,
+          email: data.user.email,
+          rol: data.user.role || data.user.rol || 'COMPRADOR',
+          activo: data.user.activo !== undefined ? data.user.activo : true,
+          needPasswordChange: data.user.needPasswordChange || false,
+          direccion: data.user.direccion || {}
+        } : null,
+        needPasswordChange: data.user?.needPasswordChange || false,
+        userId: data.user?.id || data.user?._id,
+        error: data.error
+      }
     } catch (error) {
       console.error('❌ Login error:', error)
       return {
         success: false,
-        error: error.response?.data?.error || 'Error al iniciar sesión'
+        error: error.response?.data?.error || error.response?.data?.message || 'Error al iniciar sesión'
       }
     }
   },
 
-  // Registro de usuario
   async register(userData) {
     try {
       console.log('📝 Registrando usuario:', userData.email)
-      const response = await api.post('/auth/register', userData)
-      console.log('✅ Registro exitoso:', response.data)
-      return response.data
+      const response = await api.post('/auth/register', {
+        nombre: userData.nombre,
+        email: userData.email,
+        password: userData.password,
+        role: userData.rol || 'COMPRADOR'
+      })
+      
+      return {
+        success: response.data.success || false,
+        user: response.data.user,
+        error: response.data.error
+      }
     } catch (error) {
       console.error('❌ Registro error:', error)
       return {
         success: false,
-        error: error.response?.data?.error || 'Error al registrar usuario'
+        error: error.response?.data?.error || error.response?.data?.message || 'Error al registrar usuario'
       }
     }
   },
 
-  // Login con Google
-  async googleLogin(googleToken) {
-    try {
-      const response = await api.post('/auth/google', { token: googleToken })
-      return response.data
-    } catch (error) {
-      return {
-        success: false,
-        error: error.response?.data?.error || 'Error al autenticar con Google'
-      }
-    }
-  },
-
-  // Verificar token
   async verifyToken() {
     try {
       const token = localStorage.getItem('jwt')
@@ -61,12 +73,10 @@ export const authService = {
     }
   },
 
-  // Cambiar contraseña
   async updatePassword(email, userId, newPassword) {
     try {
       const response = await api.post('/auth/change-password', {
         email,
-        userId,
         newPassword
       })
       return response.data
@@ -78,38 +88,37 @@ export const authService = {
     }
   },
 
-  // Solicitar reset de contraseña
   async requestPasswordReset(email) {
     try {
-      const response = await api.post('/auth/request-reset', { email })
-      return response.data
+      // Simular envío de código (backend no tiene este endpoint aún)
+      const code = Math.floor(100000 + Math.random() * 900000).toString()
+      console.log(`📧 Código de verificación para ${email}: ${code}`)
+      return { success: true, code }
     } catch (error) {
       return {
         success: false,
-        error: error.response?.data?.error || 'Error al solicitar reset'
+        error: 'Error al solicitar reset'
       }
     }
   },
 
-  // Verificar código de reset
   async verifyResetCode(email, code) {
     try {
-      const response = await api.post('/auth/verify-reset', { email, code })
-      return response.data
+      // Verificación simulada
+      return { success: true }
     } catch (error) {
       return {
         success: false,
-        error: error.response?.data?.error || 'Código inválido o expirado'
+        error: 'Código inválido'
       }
     }
   },
 
-  // Resetear contraseña
   async resetPassword(email, newPassword) {
     try {
-      const response = await api.post('/auth/reset-password', { 
-        email, 
-        newPassword 
+      const response = await api.post('/auth/change-password', {
+        email,
+        newPassword
       })
       return response.data
     } catch (error) {
@@ -120,7 +129,6 @@ export const authService = {
     }
   },
 
-  // Cerrar sesión
   logout() {
     localStorage.removeItem('jwt')
     localStorage.removeItem('user')
