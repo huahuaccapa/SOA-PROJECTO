@@ -1,4 +1,4 @@
-// src/pages/AdminPage.jsx
+// src\pages\AdminPage.jsx
 import React, { useState, useEffect } from 'react'
 import { Routes, Route, Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
@@ -11,7 +11,7 @@ import {
   TrendingUp, UserPlus, DollarSign, ShoppingBag, 
   BarChart3, FileText, CheckCircle, XCircle, Clock,
   Store, Truck, Shield, Zap, Eye, EyeOff,
-  Download, Printer, Calendar, Filter
+  Download, Printer, Calendar, Filter, X
 } from 'lucide-react'
 
 // ============================================
@@ -31,7 +31,6 @@ const AdminDashboard = () => {
   })
   const [recentOrders, setRecentOrders] = useState([])
   const [loading, setLoading] = useState(true)
-  const { token } = useAuth()
 
   useEffect(() => {
     loadStats()
@@ -40,7 +39,7 @@ const AdminDashboard = () => {
   const loadStats = async () => {
     setLoading(true)
     const products = await productService.getAllProducts()
-    const orders = await orderService.getOrders(token)
+    const orders = await orderService.getOrders()
     const users = await userService.getAllUsers()
     
     const today = new Date()
@@ -50,12 +49,12 @@ const AdminDashboard = () => {
       totalProducts: products.length,
       totalOrders: orders.length,
       totalUsers: users.length,
-      totalRevenue: orders.reduce((sum, o) => sum + o.total, 0),
+      totalRevenue: orders.reduce((sum, o) => sum + (o.total || 0), 0),
       totalVendedores: users.filter(u => u.rol === 'VENDEDOR').length,
       totalCompradores: users.filter(u => u.rol === 'COMPRADOR').length,
       totalVentasMes: orders
         .filter(o => new Date(o.fecha) >= monthStart)
-        .reduce((sum, o) => sum + o.total, 0),
+        .reduce((sum, o) => sum + (o.total || 0), 0),
       productosActivos: products.filter(p => p.activo).length,
       productosInactivos: products.filter(p => !p.activo).length
     })
@@ -95,7 +94,6 @@ const AdminDashboard = () => {
         </div>
       </div>
       
-      {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {statCards.map((stat, index) => (
           <div key={index} className="card p-4 hover:scale-105 transition-all duration-300">
@@ -112,7 +110,6 @@ const AdminDashboard = () => {
         ))}
       </div>
       
-      {/* Pedidos Recientes */}
       <div className="card p-6">
         <h2 className="text-xl font-semibold mb-4 text-white flex items-center gap-2">
           <Clock className="w-5 h-5 text-cyan-400" />
@@ -134,21 +131,23 @@ const AdminDashboard = () => {
             <tbody>
               {recentOrders.map(order => (
                 <tr key={order.id} className="border-b border-gray-800 last:border-0 hover:bg-gray-800/30 transition">
-                  <td className="py-3 text-gray-300 text-sm">#{order.id}</td>
+                  <td className="py-3 text-gray-300 text-sm">#{typeof order.id === 'string' ? order.id.slice(0, 8) : order.id}</td>
                   <td className="py-3 text-gray-300">{order.compradorNombre || 'N/A'}</td>
                   <td className="py-3 text-gray-300">{order.vendedorNombre || 'N/A'}</td>
-                  <td className="py-3 text-cyan-400 font-medium">S/ {order.total.toFixed(2)}</td>
+                  <td className="py-3 text-cyan-400 font-medium">S/ {order.total?.toFixed(2) || '0.00'}</td>
                   <td className="py-3">
                     <span className={`px-2 py-1 rounded-full text-xs ${
                       order.estado === 'CONFIRMADO' 
                         ? 'bg-green-500/20 text-green-400' 
+                        : order.estado === 'CANCELADO'
+                        ? 'bg-red-500/20 text-red-400'
                         : 'bg-yellow-500/20 text-yellow-400'
                     }`}>
-                      {order.estado}
+                      {order.estado || 'PENDIENTE'}
                     </span>
                   </td>
                   <td className="py-3 text-gray-500 text-sm">
-                    {new Date(order.fecha).toLocaleDateString()}
+                    {order.fecha ? new Date(order.fecha).toLocaleDateString() : 'N/A'}
                   </td>
                   <td className="py-3">
                     <button className="text-cyan-400 hover:text-cyan-300 transition">
@@ -239,7 +238,7 @@ const ProductManagement = () => {
       ...formData,
       precio: parseFloat(formData.precio),
       stock: parseInt(formData.stock),
-      vendedorId: parseInt(formData.vendedorId) || null,
+      vendedorId: formData.vendedorId ? parseInt(formData.vendedorId) : null,
       vendedorNombre: formData.vendedorNombre || null,
       activo: true
     }
@@ -340,8 +339,6 @@ const ProductManagement = () => {
                 <th className="p-4">Vendedor</th>
                 <th className="p-4">Precio</th>
                 <th className="p-4">Stock</th>
-                <th className="p-4">IGV</th>
-                <th className="p-4">Delivery</th>
                 <th className="p-4">Estado</th>
                 <th className="p-4">Acciones</th>
               </tr>
@@ -349,7 +346,7 @@ const ProductManagement = () => {
             <tbody>
               {products.map(product => (
                 <tr key={product.id} className="border-b border-gray-800 hover:bg-gray-800/30 transition">
-                  <td className="p-4 text-gray-300 text-sm">{product.id}</td>
+                  <td className="p-4 text-gray-300 text-sm">{typeof product.id === 'string' ? product.id.slice(0, 8) : product.id}</td>
                   <td className="p-4">
                     <div>
                       <p className="font-medium text-white">{product.nombre}</p>
@@ -360,7 +357,7 @@ const ProductManagement = () => {
                   <td className="p-4 text-gray-300">
                     {product.vendedorNombre || 'Sin vendedor'}
                   </td>
-                  <td className="p-4 text-cyan-400 font-medium">S/ {product.precio.toFixed(2)}</td>
+                  <td className="p-4 text-cyan-400 font-medium">S/ {product.precio?.toFixed(2) || '0.00'}</td>
                   <td className="p-4">
                     <span className={`px-2 py-1 rounded-full text-xs ${
                       product.stock > 10 
@@ -370,16 +367,6 @@ const ProductManagement = () => {
                         : 'bg-red-500/20 text-red-400'
                     }`}>
                       {product.stock}
-                    </span>
-                  </td>
-                  <td className="p-4">
-                    <span className={product.tieneIGV ? 'text-green-400' : 'text-gray-500'}>
-                      {product.tieneIGV ? '✓' : '✗'}
-                    </span>
-                  </td>
-                  <td className="p-4">
-                    <span className={product.deliveryGratis ? 'text-green-400' : 'text-gray-500'}>
-                      {product.deliveryGratis ? '✓' : '✗'}
                     </span>
                   </td>
                   <td className="p-4">
@@ -430,9 +417,20 @@ const ProductManagement = () => {
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-70 backdrop-blur-sm">
           <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-cyan-500/30">
-            <h3 className="text-xl font-bold mb-4 text-white">
-              {editingProduct ? 'Editar Producto' : 'Nuevo Producto'}
-            </h3>
+            <div className="flex justify-between items-start mb-4">
+              <h3 className="text-xl font-bold text-white">
+                {editingProduct ? 'Editar Producto' : 'Nuevo Producto'}
+              </h3>
+              <button
+                onClick={() => {
+                  setShowModal(false)
+                  resetForm()
+                }}
+                className="text-gray-400 hover:text-white transition"
+              >
+                <X size={24} />
+              </button>
+            </div>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -523,7 +521,7 @@ const ProductManagement = () => {
                 </div>
               </div>
               
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-1 text-gray-300">Peso (kg)</label>
                   <input
@@ -533,16 +531,6 @@ const ProductManagement = () => {
                     onChange={(e) => setFormData({...formData, peso: e.target.value})}
                     className="input-field"
                     placeholder="2.5"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1 text-gray-300">Dimensiones (cm)</label>
-                  <input
-                    type="text"
-                    value={formData.dimensiones}
-                    onChange={(e) => setFormData({...formData, dimensiones: e.target.value})}
-                    className="input-field"
-                    placeholder="35.4 x 25.9 x 2.3"
                   />
                 </div>
                 <div>
@@ -620,7 +608,7 @@ const ProductManagement = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-gray-500 text-sm">ID</p>
-                  <p className="text-white">#{selectedProduct.id}</p>
+                  <p className="text-white">#{typeof selectedProduct.id === 'string' ? selectedProduct.id.slice(0, 8) : selectedProduct.id}</p>
                 </div>
                 <div>
                   <p className="text-gray-500 text-sm">Categoría</p>
@@ -628,7 +616,7 @@ const ProductManagement = () => {
                 </div>
                 <div>
                   <p className="text-gray-500 text-sm">Precio</p>
-                  <p className="text-cyan-400 font-bold">S/ {selectedProduct.precio.toFixed(2)}</p>
+                  <p className="text-cyan-400 font-bold">S/ {selectedProduct.precio?.toFixed(2) || '0.00'}</p>
                 </div>
                 <div>
                   <p className="text-gray-500 text-sm">Stock</p>
@@ -645,30 +633,6 @@ const ProductManagement = () => {
                   }`}>
                     {selectedProduct.activo ? 'Activo' : 'Inactivo'}
                   </span>
-                </div>
-                <div>
-                  <p className="text-gray-500 text-sm">IGV</p>
-                  <p className="text-white">{selectedProduct.tieneIGV ? 'Incluido' : 'No incluido'}</p>
-                </div>
-                <div>
-                  <p className="text-gray-500 text-sm">Delivery</p>
-                  <p className="text-white">{selectedProduct.deliveryGratis ? 'Gratis' : 'Con costo'}</p>
-                </div>
-                <div>
-                  <p className="text-gray-500 text-sm">Peso</p>
-                  <p className="text-white">{selectedProduct.peso || 'N/A'} kg</p>
-                </div>
-                <div>
-                  <p className="text-gray-500 text-sm">Dimensiones</p>
-                  <p className="text-white">{selectedProduct.dimensiones || 'N/A'}</p>
-                </div>
-                <div>
-                  <p className="text-gray-500 text-sm">Garantía</p>
-                  <p className="text-white">{selectedProduct.garantia || 'N/A'}</p>
-                </div>
-                <div>
-                  <p className="text-gray-500 text-sm">Fecha Creación</p>
-                  <p className="text-white">{new Date(selectedProduct.fechaCreacion).toLocaleDateString()}</p>
                 </div>
               </div>
               
@@ -715,7 +679,7 @@ const ProductManagement = () => {
 }
 
 // ============================================
-// GESTIÓN DE USUARIOS (ADMIN)
+// GESTIÓN DE USUARIOS (ADMIN) - ACTUALIZADO
 // ============================================
 const AdminUsers = () => {
   const [users, setUsers] = useState([])
@@ -825,15 +789,13 @@ const AdminUsers = () => {
                 <th className="p-4">Email</th>
                 <th className="p-4">Rol</th>
                 <th className="p-4">Estado</th>
-                <th className="p-4">Ventas</th>
-                <th className="p-4">Sesión</th>
                 <th className="p-4">Acciones</th>
               </tr>
             </thead>
             <tbody>
               {users.map(user => (
                 <tr key={user.id} className="border-b border-gray-800 hover:bg-gray-800/30 transition">
-                  <td className="p-4 text-gray-300 text-sm">{user.id}</td>
+                  <td className="p-4 text-gray-300 text-sm">{typeof user.id === 'string' ? user.id.slice(0, 8) : user.id}</td>
                   <td className="p-4">
                     <div>
                       <p className="font-medium text-white">{user.nombre}</p>
@@ -864,23 +826,6 @@ const AdminUsers = () => {
                     >
                       {user.activo ? 'Activo' : 'Inactivo'}
                     </button>
-                  </td>
-                  <td className="p-4 text-gray-300">
-                    {user.rol === 'VENDEDOR' ? (
-                      <div>
-                        <p className="text-sm">{user.ventasRealizadas || 0} ventas</p>
-                        <p className="text-xs text-cyan-400">S/ {(user.totalVentas || 0).toFixed(2)}</p>
-                      </div>
-                    ) : (
-                      <span className="text-gray-500 text-sm">-</span>
-                    )}
-                  </td>
-                  <td className="p-4">
-                    <span className={`flex items-center gap-1 text-xs ${
-                      user.estadoSesion === 'activa' ? 'text-green-400' : 'text-red-400'
-                    }`}>
-                      {user.estadoSesion === 'activa' ? '🟢 Activa' : '🔴 Inactiva'}
-                    </span>
                   </td>
                   <td className="p-4">
                     <div className="flex gap-2">
@@ -913,7 +858,18 @@ const AdminUsers = () => {
       {showCreateModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-70 backdrop-blur-sm">
           <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-xl p-6 max-w-md w-full border border-cyan-500/30">
-            <h3 className="text-xl font-bold mb-4 text-white">Crear Nuevo Usuario</h3>
+            <div className="flex justify-between items-start mb-4">
+              <h3 className="text-xl font-bold text-white">Crear Nuevo Usuario</h3>
+              <button
+                onClick={() => {
+                  setShowCreateModal(false)
+                  setFormData({ nombre: '', email: '', password: '', rol: 'COMPRADOR', tienda: '', ruc: '', telefono: '' })
+                }}
+                className="text-gray-400 hover:text-white transition"
+              >
+                <X size={24} />
+              </button>
+            </div>
             <form onSubmit={handleCreateUser} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium mb-1 text-gray-300">Nombre Completo *</label>
@@ -1027,6 +983,10 @@ const AdminUsers = () => {
             
             <div className="space-y-3">
               <div>
+                <p className="text-gray-500 text-sm">ID</p>
+                <p className="text-white">{selectedUser.id}</p>
+              </div>
+              <div>
                 <p className="text-gray-500 text-sm">Email</p>
                 <p className="text-white">{selectedUser.email}</p>
               </div>
@@ -1044,11 +1004,7 @@ const AdminUsers = () => {
               </div>
               <div>
                 <p className="text-gray-500 text-sm">Fecha Registro</p>
-                <p className="text-white">{new Date(selectedUser.fechaRegistro).toLocaleDateString()}</p>
-              </div>
-              <div>
-                <p className="text-gray-500 text-sm">Último Acceso</p>
-                <p className="text-white">{selectedUser.ultimoAcceso ? new Date(selectedUser.ultimoAcceso).toLocaleString() : 'N/A'}</p>
+                <p className="text-white">{selectedUser.fechaRegistro ? new Date(selectedUser.fechaRegistro).toLocaleDateString() : 'N/A'}</p>
               </div>
               {selectedUser.rol === 'VENDEDOR' && (
                 <>
@@ -1063,14 +1019,6 @@ const AdminUsers = () => {
                   <div>
                     <p className="text-gray-500 text-sm">Teléfono</p>
                     <p className="text-white">{selectedUser.telefono || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-500 text-sm">Ventas Realizadas</p>
-                    <p className="text-cyan-400 font-bold">{selectedUser.ventasRealizadas || 0}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-500 text-sm">Total Ventas</p>
-                    <p className="text-cyan-400 font-bold">S/ {(selectedUser.totalVentas || 0).toFixed(2)}</p>
                   </div>
                 </>
               )}
@@ -1087,151 +1035,6 @@ const AdminUsers = () => {
           </div>
         </div>
       )}
-    </div>
-  )
-}
-
-// ============================================
-// REPORTES (ADMIN)
-// ============================================
-const ReportsPage = () => {
-  const [reports, setReports] = useState([])
-  const [reportType, setReportType] = useState('VENTAS_POR_VENDEDOR')
-  const [loading, setLoading] = useState(false)
-  const [selectedVendor, setSelectedVendor] = useState('all')
-  const [vendedores, setVendedores] = useState([])
-  const { showSuccess, showError } = useNotification()
-
-  useEffect(() => {
-    loadVendedores()
-    loadReport()
-  }, [])
-
-  const loadVendedores = async () => {
-    const users = await userService.getAllUsers()
-    setVendedores(users.filter(u => u.rol === 'VENDEDOR'))
-  }
-
-  const loadReport = async () => {
-    setLoading(true)
-    try {
-      const vendorId = selectedVendor !== 'all' ? parseInt(selectedVendor) : null
-      const data = await productService.getReports(reportType, vendorId)
-      setReports(data)
-    } catch (error) {
-      showError('Error al cargar el reporte')
-    }
-    setLoading(false)
-  }
-
-  useEffect(() => {
-    loadReport()
-  }, [reportType, selectedVendor])
-
-  const getReportTitle = () => {
-    switch(reportType) {
-      case 'VENTAS_POR_VENDEDOR': return 'Ventas por Vendedor'
-      case 'VENTAS_POR_MES': return 'Ventas por Mes'
-      case 'PRODUCTOS_POPULARES': return 'Productos Más Vendidos'
-      default: return 'Reporte'
-    }
-  }
-
-  const exportReport = () => {
-    const csv = reports.map(r => Object.values(r).join(',')).join('\n')
-    const blob = new Blob([csv], { type: 'text/csv' })
-    const url = window.URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `reporte_${reportType}_${new Date().toISOString().slice(0,10)}.csv`
-    a.click()
-    showSuccess('Reporte exportado exitosamente')
-  }
-
-  return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-white">Reportes y Estadísticas</h2>
-        <button
-          onClick={exportReport}
-          className="btn-primary flex items-center gap-2"
-          disabled={reports.length === 0}
-        >
-          <Download size={18} />
-          Exportar CSV
-        </button>
-      </div>
-      
-      <div className="card p-6">
-        <div className="flex flex-wrap gap-4 mb-6">
-          <div className="flex-1 min-w-[200px]">
-            <label className="block text-sm font-medium mb-1 text-gray-300">Tipo de Reporte</label>
-            <select
-              value={reportType}
-              onChange={(e) => setReportType(e.target.value)}
-              className="input-field"
-            >
-              <option value="VENTAS_POR_VENDEDOR">Ventas por Vendedor</option>
-              <option value="VENTAS_POR_MES">Ventas por Mes</option>
-              <option value="PRODUCTOS_POPULARES">Productos Más Vendidos</option>
-            </select>
-          </div>
-          <div className="flex-1 min-w-[200px]">
-            <label className="block text-sm font-medium mb-1 text-gray-300">Vendedor</label>
-            <select
-              value={selectedVendor}
-              onChange={(e) => setSelectedVendor(e.target.value)}
-              className="input-field"
-            >
-              <option value="all">Todos los Vendedores</option>
-              {vendedores.map(v => (
-                <option key={v.id} value={v.id}>{v.nombre}</option>
-              ))}
-            </select>
-          </div>
-          <div className="flex items-end">
-            <button onClick={loadReport} className="btn-secondary flex items-center gap-2">
-              <Filter size={18} />
-              Filtrar
-            </button>
-          </div>
-        </div>
-        
-        <div className="overflow-x-auto">
-          {loading ? (
-            <div className="flex justify-center items-center h-32">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-400"></div>
-            </div>
-          ) : reports.length === 0 ? (
-            <p className="text-center text-gray-400 py-8">No hay datos disponibles para este reporte</p>
-          ) : (
-            <table className="w-full">
-              <thead className="border-b border-gray-700">
-                <tr className="text-left text-gray-400 text-sm">
-                  {Object.keys(reports[0]).map(key => (
-                    <th key={key} className="p-3">
-                      {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {reports.map((item, index) => (
-                  <tr key={index} className="border-b border-gray-800 hover:bg-gray-800/30 transition">
-                    {Object.values(item).map((value, i) => (
-                      <td key={i} className="p-3 text-gray-300">
-                        {typeof value === 'number' ? 
-                          value.toFixed ? `S/ ${value.toFixed(2)}` : value 
-                          : value}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </div>
     </div>
   )
 }
@@ -1341,6 +1144,143 @@ const VendorRequestsPage = () => {
             </table>
           </div>
         )}
+      </div>
+    </div>
+  )
+}
+
+// ============================================
+// REPORTES (ADMIN)
+// ============================================
+const ReportsPage = () => {
+  const [reports, setReports] = useState([])
+  const [reportType, setReportType] = useState('VENTAS_POR_VENDEDOR')
+  const [loading, setLoading] = useState(false)
+  const [selectedVendor, setSelectedVendor] = useState('all')
+  const [vendedores, setVendedores] = useState([])
+  const { showSuccess, showError } = useNotification()
+
+  useEffect(() => {
+    loadVendedores()
+    loadReport()
+  }, [])
+
+  const loadVendedores = async () => {
+    const users = await userService.getAllUsers()
+    setVendedores(users.filter(u => u.rol === 'VENDEDOR'))
+  }
+
+  const loadReport = async () => {
+    setLoading(true)
+    try {
+      const vendorId = selectedVendor !== 'all' ? parseInt(selectedVendor) : null
+      const data = await productService.getReports(reportType, vendorId)
+      setReports(data)
+    } catch (error) {
+      showError('Error al cargar el reporte')
+    }
+    setLoading(false)
+  }
+
+  useEffect(() => {
+    loadReport()
+  }, [reportType, selectedVendor])
+
+  const exportReport = () => {
+    if (reports.length === 0) return
+    const csv = reports.map(r => Object.values(r).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `reporte_${reportType}_${new Date().toISOString().slice(0,10)}.csv`
+    a.click()
+    showSuccess('Reporte exportado exitosamente')
+  }
+
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold text-white">Reportes y Estadísticas</h2>
+        <button
+          onClick={exportReport}
+          className="btn-primary flex items-center gap-2"
+          disabled={reports.length === 0}
+        >
+          <Download size={18} />
+          Exportar CSV
+        </button>
+      </div>
+      
+      <div className="card p-6">
+        <div className="flex flex-wrap gap-4 mb-6">
+          <div className="flex-1 min-w-[200px]">
+            <label className="block text-sm font-medium mb-1 text-gray-300">Tipo de Reporte</label>
+            <select
+              value={reportType}
+              onChange={(e) => setReportType(e.target.value)}
+              className="input-field"
+            >
+              <option value="VENTAS_POR_VENDEDOR">Ventas por Vendedor</option>
+              <option value="VENTAS_POR_MES">Ventas por Mes</option>
+              <option value="PRODUCTOS_POPULARES">Productos Más Vendidos</option>
+            </select>
+          </div>
+          <div className="flex-1 min-w-[200px]">
+            <label className="block text-sm font-medium mb-1 text-gray-300">Vendedor</label>
+            <select
+              value={selectedVendor}
+              onChange={(e) => setSelectedVendor(e.target.value)}
+              className="input-field"
+            >
+              <option value="all">Todos los Vendedores</option>
+              {vendedores.map(v => (
+                <option key={v.id} value={v.id}>{v.nombre}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex items-end">
+            <button onClick={loadReport} className="btn-secondary flex items-center gap-2">
+              <Filter size={18} />
+              Filtrar
+            </button>
+          </div>
+        </div>
+        
+        <div className="overflow-x-auto">
+          {loading ? (
+            <div className="flex justify-center items-center h-32">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-400"></div>
+            </div>
+          ) : reports.length === 0 ? (
+            <p className="text-center text-gray-400 py-8">No hay datos disponibles para este reporte</p>
+          ) : (
+            <table className="w-full">
+              <thead className="border-b border-gray-700">
+                <tr className="text-left text-gray-400 text-sm">
+                  {Object.keys(reports[0]).map(key => (
+                    <th key={key} className="p-3">
+                      {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {reports.map((item, index) => (
+                  <tr key={index} className="border-b border-gray-800 hover:bg-gray-800/30 transition">
+                    {Object.values(item).map((value, i) => (
+                      <td key={i} className="p-3 text-gray-300">
+                        {typeof value === 'number' ? 
+                          value.toFixed ? `S/ ${value.toFixed(2)}` : value 
+                          : value}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
       </div>
     </div>
   )
