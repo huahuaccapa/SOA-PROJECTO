@@ -1,3 +1,4 @@
+//src\contexts\AuthContext.jsx
 import React, { createContext, useState, useContext, useEffect } from 'react'
 import { authService } from '../services/authService'
 import { userService } from '../services/userService'
@@ -25,7 +26,6 @@ export const AuthProvider = ({ children }) => {
       
       if (storedToken && storedUser) {
         try {
-          // Verificar token con el backend
           const response = await authService.verifyToken()
           if (response.valid) {
             setToken(storedToken)
@@ -39,7 +39,7 @@ export const AuthProvider = ({ children }) => {
             setToken(null)
             // Establecer usuario invitado
             setUser({
-              id: 0,
+              id: 'invitado',
               nombre: 'Invitado',
               email: 'invitado@byteverse.com',
               rol: 'INVITADO',
@@ -51,7 +51,7 @@ export const AuthProvider = ({ children }) => {
           localStorage.removeItem('jwt')
           localStorage.removeItem('user')
           setUser({
-            id: 0,
+            id: 'invitado',
             nombre: 'Invitado',
             email: 'invitado@byteverse.com',
             rol: 'INVITADO',
@@ -62,7 +62,7 @@ export const AuthProvider = ({ children }) => {
       } else {
         console.log('👤 Usuario invitado')
         setUser({
-          id: 0,
+          id: 'invitado',
           nombre: 'Invitado',
           email: 'invitado@byteverse.com',
           rol: 'INVITADO',
@@ -83,13 +83,12 @@ export const AuthProvider = ({ children }) => {
       if (response.success) {
         console.log('✅ Login exitoso')
         
-        // Verificar si necesita cambiar contraseña
         if (response.needPasswordChange) {
           return { 
             success: true, 
             needPasswordChange: true, 
-            userId: response.user?.id,
-            email: response.user?.email
+            userId: response.userId,
+            email: response.user?.email || email
           }
         }
         
@@ -118,10 +117,11 @@ export const AuthProvider = ({ children }) => {
       const response = await authService.googleLogin(googleToken)
       
       if (response.success) {
-        setUser(response.user)
+        const userData = response.user
+        setUser(userData)
         setToken(response.token)
         localStorage.setItem('jwt', response.token)
-        localStorage.setItem('user', JSON.stringify(response.user))
+        localStorage.setItem('user', JSON.stringify(userData))
         return { success: true }
       }
       return { success: false, error: response.error || 'Error con Google' }
@@ -150,8 +150,7 @@ export const AuthProvider = ({ children }) => {
       setUser(updatedUser)
       localStorage.setItem('user', JSON.stringify(updatedUser))
       
-      // Sincronizar con backend si es usuario autenticado
-      if (user?.id && user?.id !== 0) {
+      if (user?.id && user?.id !== 'invitado') {
         await userService.updateUser(user.id, userData)
       }
       
@@ -201,7 +200,7 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     authService.logout()
     setUser({
-      id: 0,
+      id: 'invitado',
       nombre: 'Invitado',
       email: 'invitado@byteverse.com',
       rol: 'INVITADO',
@@ -224,7 +223,7 @@ export const AuthProvider = ({ children }) => {
     requestPasswordReset,
     verifyResetCode,
     resetPassword,
-    isAuthenticated: user?.rol !== 'INVITADO' && !!user?.id && user?.id !== 0,
+    isAuthenticated: user?.rol !== 'INVITADO' && user?.id !== 'invitado',
     isAdmin: user?.rol === 'ADMIN',
     isVendedor: user?.rol === 'VENDEDOR',
     isComprador: user?.rol === 'COMPRADOR',
