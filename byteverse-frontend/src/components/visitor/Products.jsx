@@ -1,5 +1,6 @@
+// src/components/visitor/Products.jsx
 import React, { useState, useEffect } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import api from '../../api/axios';
 import { useCart } from '../../hooks/useCart';
 import { useAuth } from '../../context/AuthContext';
@@ -16,6 +17,7 @@ const Products = () => {
   const [showFilters, setShowFilters] = useState(false);
   const { addToCart } = useCart();
   const { isAuthenticated } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchProducts();
@@ -50,14 +52,14 @@ const Products = () => {
     }
   };
 
-  // ✅ AGREGAR AL CARRITO - ACTUALIZADO
+  // ✅ Manejar "Agregar al carrito" para visitantes
   const handleAddToCart = (product) => {
     if (!isAuthenticated) {
-      toast.error('Inicia sesión para agregar al carrito');
+      toast.error('⚠️ Debes iniciar sesión para agregar productos al carrito');
+      navigate('/login');
       return;
     }
 
-    // ✅ Asegurar que el producto tenga todos los campos necesarios
     const productData = {
       ...product,
       _id: product._id || product.id,
@@ -67,6 +69,11 @@ const Products = () => {
     };
 
     addToCart(productData);
+  };
+
+  // ✅ Manejar clic en producto para visitantes
+  const handleProductClick = (productId) => {
+    navigate(`/product/${productId}`);
   };
 
   const filteredProducts = products.filter(product => {
@@ -146,7 +153,10 @@ const Products = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {filteredProducts.map((product) => (
               <div key={product._id || product.id} className="card group">
-                <div className="relative overflow-hidden">
+                <div 
+                  className="relative overflow-hidden cursor-pointer"
+                  onClick={() => handleProductClick(product._id || product.id)}
+                >
                   <img
                     src={product.imagen || 'https://via.placeholder.com/300x200?text=Producto'}
                     alt={product.nombre || 'Producto'}
@@ -163,11 +173,14 @@ const Products = () => {
                 </div>
                 
                 <div className="p-4">
-                  <Link to={`/product/${product._id || product.id}`}>
+                  <div 
+                    className="cursor-pointer"
+                    onClick={() => handleProductClick(product._id || product.id)}
+                  >
                     <h3 className="font-semibold text-lg mb-1 hover:text-primary-600 transition-colors line-clamp-1">
                       {product.nombre || 'Producto'}
                     </h3>
-                  </Link>
+                  </div>
                   <p className="text-gray-600 text-sm mb-3 line-clamp-2">{product.descripcion || ''}</p>
                   
                   <div className="flex items-center justify-between">
