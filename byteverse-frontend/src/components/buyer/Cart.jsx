@@ -1,21 +1,36 @@
-import React from 'react';
+// src/components/buyer/Cart.jsx
+import React, { useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../../hooks/useCart';
 import { useAuth } from '../../context/AuthContext';
 import { TrashIcon, MinusIcon, PlusIcon } from '@heroicons/react/24/outline';
+import toast from 'react-hot-toast';
 
 const Cart = () => {
   const { cart, totalItems, totalPrice, removeFromCart, updateQuantity, clearCart } = useCart();
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
+  // ✅ Redirigir si no está autenticado
+  useEffect(() => {
+    if (!isAuthenticated) {
+      toast.error('⚠️ Debes iniciar sesión para ver tu carrito');
+      navigate('/login');
+    }
+  }, [isAuthenticated, navigate]);
+
   const handleCheckout = () => {
     if (!isAuthenticated) {
+      toast.error('⚠️ Debes iniciar sesión para proceder al pago');
       navigate('/login');
       return;
     }
     navigate('/checkout');
   };
+
+  if (!isAuthenticated) {
+    return null; // O un mensaje de redirección
+  }
 
   if (cart.length === 0) {
     return (
