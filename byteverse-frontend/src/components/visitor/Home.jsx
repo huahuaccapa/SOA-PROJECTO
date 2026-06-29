@@ -1,5 +1,6 @@
+// src/components/visitor/Home.jsx
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import api from '../../api/axios';
 import { useCart } from '../../hooks/useCart';
 import { useAuth } from '../../context/AuthContext';
@@ -10,6 +11,7 @@ const Home = () => {
   const [loading, setLoading] = useState(true);
   const { addToCart } = useCart();
   const { isAuthenticated } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchFeaturedProducts();
@@ -26,12 +28,19 @@ const Home = () => {
     }
   };
 
+  // ✅ Manejar "Agregar al carrito" para visitantes
   const handleAddToCart = (product) => {
     if (!isAuthenticated) {
-      toast.error('Inicia sesión para agregar al carrito');
+      toast.error('⚠️ Debes iniciar sesión para agregar productos al carrito');
+      navigate('/login');
       return;
     }
     addToCart(product);
+  };
+
+  // ✅ Manejar "Ver Productos" para visitantes
+  const handleViewProducts = () => {
+    navigate('/products');
   };
 
   const categories = [
@@ -43,7 +52,7 @@ const Home = () => {
 
   return (
     <div className="min-h-screen">
-      {/* Hero Section */}
+      {/* ✅ Hero Section con mensaje para visitantes */}
       <section className="relative bg-gradient-to-r from-primary-600 to-secondary-600 text-white py-20">
         <div className="absolute inset-0 bg-black opacity-10"></div>
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -54,9 +63,31 @@ const Home = () => {
             <p className="text-xl md:text-2xl mb-8 text-primary-100 max-w-3xl mx-auto">
               Descubre la mejor tecnología al mejor precio. Encuentra lo que necesitas en nuestro catálogo.
             </p>
-            <Link to="/products" className="btn-primary bg-white text-primary-600 hover:bg-gray-100 text-lg px-8 py-3">
+            
+            {/* ✅ Botón adaptado para visitantes */}
+            <button
+              onClick={handleViewProducts}
+              className="btn-primary bg-white text-primary-600 hover:bg-gray-100 text-lg px-8 py-3"
+            >
               Ver Productos
-            </Link>
+            </button>
+
+            {/* ✅ Mensaje para visitantes */}
+            {!isAuthenticated && (
+              <div className="mt-6 bg-white bg-opacity-20 rounded-lg p-4 max-w-md mx-auto">
+                <p className="text-sm text-white">
+                  💡 ¿Quieres comprar?{' '}
+                  <Link to="/login" className="font-bold underline hover:no-underline">
+                    Inicia sesión
+                  </Link>
+                  {' '}o{' '}
+                  <Link to="/register" className="font-bold underline hover:no-underline">
+                    regístrate
+                  </Link>
+                  {' '}para acceder a todas las funciones.
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </section>
@@ -94,11 +125,13 @@ const Home = () => {
               {featuredProducts.map((product) => (
                 <div key={product._id} className="card group">
                   <div className="relative overflow-hidden">
-                    <img
-                      src={product.imagen || 'https://via.placeholder.com/300x200?text=Producto'}
-                      alt={product.nombre}
-                      className="w-full h-48 object-cover group-hover:scale-110 transition-transform duration-300"
-                    />
+                    <Link to={`/product/${product._id}`}>
+                      <img
+                        src={product.imagen || 'https://via.placeholder.com/300x200?text=Producto'}
+                        alt={product.nombre}
+                        className="w-full h-48 object-cover group-hover:scale-110 transition-transform duration-300"
+                      />
+                    </Link>
                     <div className="absolute top-2 right-2 bg-primary-600 text-white px-2 py-1 rounded-lg text-xs font-semibold">
                       {product.categoria}
                     </div>
@@ -143,6 +176,16 @@ const Home = () => {
               <p className="text-gray-500">No hay productos disponibles</p>
             </div>
           )}
+          
+          {/* ✅ Botón "Ver todos los productos" */}
+          <div className="text-center mt-8">
+            <button
+              onClick={handleViewProducts}
+              className="btn-secondary text-lg px-8 py-3"
+            >
+              Ver todos los productos →
+            </button>
+          </div>
         </div>
       </section>
     </div>
