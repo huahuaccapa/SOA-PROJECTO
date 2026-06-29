@@ -1,3 +1,4 @@
+// src/App.jsx
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
@@ -18,9 +19,16 @@ import NotFound from './components/common/NotFound';
 import Cart from './components/buyer/Cart';
 import Checkout from './components/buyer/Checkout';
 import Orders from './components/buyer/Orders';
+import BuyerProfile from './components/buyer/BuyerProfile';
 
 // ✅ COMPONENTES VENDEDOR
 import VendorDashboard from './components/vendor/VendorDashboard';
+import VendorProducts from './components/vendor/VendorProducts';
+import VendorOrders from './components/vendor/VendorOrders';
+import VendorReports from './components/vendor/VendorReports';
+import VendorProfile from './components/vendor/VendorProfile';
+import VendorSearchClient from './components/vendor/VendorSearchClient';
+import VendorCart from './components/vendor/VendorCart';
 
 // ✅ COMPONENTES ADMIN
 import AdminDashboard from './components/admin/AdminDashboard';
@@ -48,20 +56,25 @@ function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               
-              {/* ✅ RUTAS COMPRADOR (Excluir Admin) */}
+              {/* ✅ RUTAS COMPRADOR */}
               <Route path="/cart" element={
-                <ProtectedRoute excludeRoles={['ADMIN']}>
+                <ProtectedRoute excludeRoles={['ADMIN', 'VENDEDOR']}>
                   <Cart />
                 </ProtectedRoute>
               } />
               <Route path="/checkout" element={
-                <ProtectedRoute excludeRoles={['ADMIN']}>
+                <ProtectedRoute excludeRoles={['ADMIN', 'VENDEDOR']}>
                   <Checkout />
                 </ProtectedRoute>
               } />
               <Route path="/orders" element={
-                <ProtectedRoute excludeRoles={['ADMIN']}>
+                <ProtectedRoute excludeRoles={['ADMIN', 'VENDEDOR']}>
                   <Orders />
+                </ProtectedRoute>
+              } />
+              <Route path="/profile" element={
+                <ProtectedRoute excludeRoles={['ADMIN', 'VENDEDOR']}>
+                  <BuyerProfile />
                 </ProtectedRoute>
               } />
               
@@ -69,6 +82,36 @@ function App() {
               <Route path="/vendor" element={
                 <ProtectedRoute roles={['VENDEDOR', 'ADMIN']}>
                   <VendorDashboard />
+                </ProtectedRoute>
+              } />
+              <Route path="/vendor/products" element={
+                <ProtectedRoute roles={['VENDEDOR', 'ADMIN']}>
+                  <VendorProducts />
+                </ProtectedRoute>
+              } />
+              <Route path="/vendor/orders" element={
+                <ProtectedRoute roles={['VENDEDOR', 'ADMIN']}>
+                  <VendorOrders />
+                </ProtectedRoute>
+              } />
+              <Route path="/vendor/reports" element={
+                <ProtectedRoute roles={['VENDEDOR', 'ADMIN']}>
+                  <VendorReports />
+                </ProtectedRoute>
+              } />
+              <Route path="/vendor/profile" element={
+                <ProtectedRoute roles={['VENDEDOR', 'ADMIN']}>
+                  <VendorProfile />
+                </ProtectedRoute>
+              } />
+              <Route path="/vendor/search-client" element={
+                <ProtectedRoute roles={['VENDEDOR', 'ADMIN']}>
+                  <VendorSearchClient />
+                </ProtectedRoute>
+              } />
+              <Route path="/vendor/cart" element={
+                <ProtectedRoute roles={['VENDEDOR', 'ADMIN']}>
+                  <VendorCart />
                 </ProtectedRoute>
               } />
               
@@ -108,7 +151,6 @@ function App() {
                   <AdminProfile />
                 </ProtectedRoute>
               } />
-              {/* ✅ NUEVAS RUTAS ADMIN */}
               <Route path="/admin/revenue" element={
                 <ProtectedRoute roles={['ADMIN']}>
                   <AdminRevenue />
