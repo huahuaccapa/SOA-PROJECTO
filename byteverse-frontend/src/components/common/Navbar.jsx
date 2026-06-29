@@ -1,3 +1,4 @@
+// src/components/common/Navbar.jsx
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -16,18 +17,24 @@ import {
   ArrowRightOnRectangleIcon,
   UserGroupIcon,
   CurrencyDollarIcon,
+  Squares2X2Icon,
+  TagIcon,
+  DocumentTextIcon,
+  MagnifyingGlassIcon,
 } from '@heroicons/react/24/outline';
 import { Menu, Transition } from '@headlessui/react';
-import toast from 'react-hot-toast';
 
 const Navbar = () => {
-  const { user, isAuthenticated, logout, isAdmin, isVendor } = useAuth();
+  const { user, isAuthenticated, logout, isAdmin, isVendor, isBuyer } = useAuth();
   const { totalItems } = useCart();
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // ✅ Check if user can buy (not admin)
-  const canBuy = isAuthenticated && !isAdmin();
+  // ✅ COMPRADOR: Carrito de compras (para comprar)
+  // ✅ VENDEDOR: Carrito de ventas (para gestionar pedidos)
+  // ✅ ADMIN: Sin carrito
+  const showBuyerCart = isAuthenticated && isBuyer();
+  const showVendorCart = isAuthenticated && isVendor();
 
   const handleLogout = () => {
     logout();
@@ -35,36 +42,96 @@ const Navbar = () => {
   };
 
   const getRoleBasedLinks = () => {
+    if (!isAuthenticated) {
+      return {
+        principal: [],
+        gestion: [],
+        ventas: [],
+        reportes: [],
+        personal: []
+      };
+    }
+
+    // ✅ ADMIN
     if (isAdmin()) {
-      return [
-        { name: 'Dashboard', path: '/admin', icon: ChartBarIcon },
-        { name: 'Usuarios', path: '/admin/users', icon: UsersIcon },
-        { name: 'Vendedores', path: '/admin/vendors', icon: UserGroupIcon },
-        { name: 'Productos', path: '/admin/products', icon: ShoppingBagIcon },
-        { name: 'Pedidos', path: '/admin/orders', icon: ClipboardDocumentListIcon },
-        { name: 'Categorías', path: '/admin/categories', icon: Cog6ToothIcon },
-        { name: 'Ingresos', path: '/admin/revenue', icon: CurrencyDollarIcon },
-        { name: 'Analytics', path: '/admin/analytics', icon: ChartBarIcon },
-        { name: 'Perfil', path: '/admin/profile', icon: UserIcon },
-      ];
+      return {
+        principal: [
+          { name: 'Dashboard', path: '/admin', icon: Squares2X2Icon },
+        ],
+        gestion: [
+          { name: 'Usuarios', path: '/admin/users', icon: UsersIcon },
+          { name: 'Vendedores', path: '/admin/vendors', icon: UserGroupIcon },
+          { name: 'Productos', path: '/admin/products', icon: ShoppingBagIcon },
+          { name: 'Categorías', path: '/admin/categories', icon: TagIcon },
+        ],
+        ventas: [
+          { name: 'Pedidos', path: '/admin/orders', icon: ClipboardDocumentListIcon },
+          { name: 'Ingresos', path: '/admin/revenue', icon: CurrencyDollarIcon },
+          { name: 'Analytics', path: '/admin/analytics', icon: ChartBarIcon },
+        ],
+        reportes: [],
+        personal: [
+          { name: 'Perfil', path: '/admin/profile', icon: UserIcon },
+        ]
+      };
     }
+
+    // ✅ VENDEDOR
     if (isVendor()) {
-      return [
-        { name: 'Dashboard', path: '/vendor', icon: ChartBarIcon },
-        { name: 'Mis Productos', path: '/vendor/products', icon: ShoppingBagIcon },
-        { name: 'Pedidos', path: '/vendor/orders', icon: ClipboardDocumentListIcon },
-      ];
+      return {
+        principal: [
+          { name: 'Dashboard', path: '/vendor', icon: Squares2X2Icon },
+        ],
+        gestion: [
+          { name: 'Mis Productos', path: '/vendor/products', icon: ShoppingBagIcon },
+          { name: 'Buscar Cliente', path: '/vendor/search-client', icon: MagnifyingGlassIcon },
+        ],
+        ventas: [
+          { name: 'Mis Pedidos', path: '/vendor/orders', icon: ClipboardDocumentListIcon },
+          { name: 'Carrito Ventas', path: '/vendor/cart', icon: ShoppingCartIcon },
+        ],
+        reportes: [
+          { name: 'Reportes', path: '/vendor/reports', icon: DocumentTextIcon },
+        ],
+        personal: [
+          { name: 'Perfil', path: '/vendor/profile', icon: UserIcon },
+        ]
+      };
     }
-    if (isAuthenticated) {
-      return [
-        { name: 'Mis Pedidos', path: '/orders', icon: ClipboardDocumentListIcon },
-        { name: 'Perfil', path: '/profile', icon: UserIcon },
-      ];
+
+    // ✅ COMPRADOR
+    if (isAuthenticated && isBuyer()) {
+      return {
+        principal: [],
+        gestion: [],
+        ventas: [
+          { name: 'Mis Pedidos', path: '/orders', icon: ClipboardDocumentListIcon },
+        ],
+        reportes: [],
+        personal: [
+          { name: 'Perfil', path: '/profile', icon: UserIcon },
+        ]
+      };
     }
-    return [];
+
+    return { principal: [], gestion: [], ventas: [], reportes: [], personal: [] };
   };
 
-  const roleLinks = getRoleBasedLinks();
+  const links = getRoleBasedLinks();
+
+  const renderLinkGroup = (group) => {
+    if (!group || group.length === 0) return null;
+    return group.map((link) => (
+      <Link
+        key={link.path}
+        to={link.path}
+        className="px-3 py-2 rounded-lg text-gray-700 hover:text-primary-600 hover:bg-primary-50 transition-all duration-200 flex items-center gap-1.5"
+      >
+        <link.icon className="w-5 h-5" />
+        <span>{link.name}</span>
+      </Link>
+    ));
+  };
 
   return (
     <nav className="bg-white shadow-lg sticky top-0 z-50">
@@ -84,6 +151,7 @@ const Navbar = () => {
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-1">
+            {/* Enlaces públicos */}
             <Link to="/" className="px-3 py-2 rounded-lg text-gray-700 hover:text-primary-600 hover:bg-primary-50 transition-all duration-200 flex items-center space-x-1">
               <HomeIcon className="w-5 h-5" />
               <span>Inicio</span>
@@ -94,27 +162,55 @@ const Navbar = () => {
               <span>Productos</span>
             </Link>
 
-            {roleLinks.map((link) => (
-              <Link
-                key={link.path}
-                to={link.path}
-                className="px-3 py-2 rounded-lg text-gray-700 hover:text-primary-600 hover:bg-primary-50 transition-all duration-200 flex items-center space-x-1"
-              >
-                <link.icon className="w-5 h-5" />
-                <span>{link.name}</span>
-              </Link>
-            ))}
+            {/* Solo si está autenticado */}
+            {isAuthenticated && (
+              <>
+                <div className="w-px h-8 bg-gray-200 mx-1"></div>
 
-            {/* ✅ Cart - Solo visible para compradores y vendedores, NO para admin */}
-            {canBuy && (
-              <Link to="/cart" className="relative px-3 py-2 rounded-lg text-gray-700 hover:text-primary-600 hover:bg-primary-50 transition-all duration-200">
-                <ShoppingCartIcon className="w-6 h-6" />
-                {totalItems > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">
-                    {totalItems}
-                  </span>
+                {/* Principal (Dashboard) */}
+                {renderLinkGroup(links.principal)}
+
+                {/* Gestión */}
+                {(links.principal.length > 0 && links.gestion.length > 0) && (
+                  <div className="w-px h-8 bg-gray-200 mx-1"></div>
                 )}
-              </Link>
+                {renderLinkGroup(links.gestion)}
+
+                {/* Ventas */}
+                {(links.gestion.length > 0 && links.ventas.length > 0) && (
+                  <div className="w-px h-8 bg-gray-200 mx-1"></div>
+                )}
+                {renderLinkGroup(links.ventas)}
+
+                {/* Reportes */}
+                {(links.ventas.length > 0 && links.reportes.length > 0) && (
+                  <div className="w-px h-8 bg-gray-200 mx-1"></div>
+                )}
+                {renderLinkGroup(links.reportes)}
+
+                {/* Personal */}
+                {(links.reportes.length > 0 && links.personal.length > 0) && (
+                  <div className="w-px h-8 bg-gray-200 mx-1"></div>
+                )}
+                {renderLinkGroup(links.personal)}
+
+                {/* ✅ Carrito para COMPRADOR (compras) */}
+                {showBuyerCart && (
+                  <>
+                    <div className="w-px h-8 bg-gray-200 mx-1"></div>
+                    <Link to="/cart" className="relative px-3 py-2 rounded-lg text-gray-700 hover:text-primary-600 hover:bg-primary-50 transition-all duration-200">
+                      <ShoppingCartIcon className="w-6 h-6" />
+                      {totalItems > 0 && (
+                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">
+                          {totalItems}
+                        </span>
+                      )}
+                    </Link>
+                  </>
+                )}
+
+                <div className="w-px h-8 bg-gray-200 mx-1"></div>
+              </>
             )}
 
             {/* Auth Buttons */}
@@ -128,7 +224,9 @@ const Navbar = () => {
                   }`}>
                     {user?.nombre?.charAt(0).toUpperCase() || 'U'}
                   </div>
-                  <span className="text-sm font-medium text-gray-700">{user?.nombre}</span>
+                  <span className="text-sm font-medium text-gray-700 max-w-[100px] truncate">
+                    {user?.nombre?.split(' ')[0] || 'Usuario'}
+                  </span>
                   {isAdmin() && (
                     <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">Admin</span>
                   )}
@@ -162,17 +260,11 @@ const Navbar = () => {
                 </Transition>
               </Menu>
             ) : (
-              <div className="flex items-center space-x-2">
-                <Link
-                  to="/login"
-                  className="px-4 py-2 rounded-lg text-primary-600 hover:bg-primary-50 transition-all duration-200 font-medium"
-                >
+              <div className="flex items-center space-x-2 ml-2">
+                <Link to="/login" className="px-4 py-2 rounded-lg text-primary-600 hover:bg-primary-50 transition-all duration-200 font-medium">
                   Iniciar Sesión
                 </Link>
-                <Link
-                  to="/register"
-                  className="btn-primary"
-                >
+                <Link to="/register" className="btn-primary">
                   Registrarse
                 </Link>
               </div>
@@ -181,8 +273,7 @@ const Navbar = () => {
 
           {/* Mobile menu button */}
           <div className="flex items-center md:hidden">
-            {/* ✅ Cart mobile - Solo para no admin */}
-            {canBuy && (
+            {showBuyerCart && (
               <Link to="/cart" className="relative p-2 text-gray-700 hover:text-primary-600">
                 <ShoppingCartIcon className="w-6 h-6" />
                 {totalItems > 0 && (
@@ -196,11 +287,7 @@ const Navbar = () => {
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               className="p-2 rounded-lg text-gray-700 hover:text-primary-600 hover:bg-primary-50 transition-all duration-200"
             >
-              {isMobileMenuOpen ? (
-                <XMarkIcon className="w-6 h-6" />
-              ) : (
-                <Bars3Icon className="w-6 h-6" />
-              )}
+              {isMobileMenuOpen ? <XMarkIcon className="w-6 h-6" /> : <Bars3Icon className="w-6 h-6" />}
             </button>
           </div>
         </div>
@@ -208,62 +295,134 @@ const Navbar = () => {
 
       {/* Mobile Menu */}
       {isMobileMenuOpen && (
-        <div className="md:hidden bg-white border-t border-gray-100 py-2">
+        <div className="md:hidden bg-white border-t border-gray-100 py-2 max-h-[80vh] overflow-y-auto">
           <div className="px-4 space-y-1">
-            <Link
-              to="/"
-              className="flex items-center space-x-2 px-3 py-2 rounded-lg text-gray-700 hover:text-primary-600 hover:bg-primary-50 transition-all duration-200"
-              onClick={() => setIsMobileMenuOpen(false)}
-            >
+            <Link to="/" className="flex items-center space-x-2 px-3 py-2 rounded-lg text-gray-700 hover:text-primary-600 hover:bg-primary-50 transition-all duration-200" onClick={() => setIsMobileMenuOpen(false)}>
               <HomeIcon className="w-5 h-5" />
               <span>Inicio</span>
             </Link>
-            <Link
-              to="/products"
-              className="flex items-center space-x-2 px-3 py-2 rounded-lg text-gray-700 hover:text-primary-600 hover:bg-primary-50 transition-all duration-200"
-              onClick={() => setIsMobileMenuOpen(false)}
-            >
+            <Link to="/products" className="flex items-center space-x-2 px-3 py-2 rounded-lg text-gray-700 hover:text-primary-600 hover:bg-primary-50 transition-all duration-200" onClick={() => setIsMobileMenuOpen(false)}>
               <ShoppingBagIcon className="w-5 h-5" />
               <span>Productos</span>
             </Link>
 
-            {roleLinks.map((link) => (
-              <Link
-                key={link.path}
-                to={link.path}
-                className="flex items-center space-x-2 px-3 py-2 rounded-lg text-gray-700 hover:text-primary-600 hover:bg-primary-50 transition-all duration-200"
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                <link.icon className="w-5 h-5" />
-                <span>{link.name}</span>
-              </Link>
-            ))}
+            {isAuthenticated && (
+              <>
+                <div className="border-t border-gray-200 my-2"></div>
+
+                {/* ADMIN */}
+                {isAdmin() && (
+                  <>
+                    <div className="px-3 py-1"><span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Principal</span></div>
+                    <Link to="/admin" className="flex items-center space-x-2 px-3 py-2 rounded-lg text-gray-700 hover:text-primary-600 hover:bg-primary-50 transition-all duration-200" onClick={() => setIsMobileMenuOpen(false)}>
+                      <Squares2X2Icon className="w-5 h-5" />
+                      <span>Dashboard</span>
+                    </Link>
+                    <div className="px-3 py-1 mt-2"><span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Gestión</span></div>
+                    <Link to="/admin/users" className="flex items-center space-x-2 px-3 py-2 rounded-lg text-gray-700 hover:text-primary-600 hover:bg-primary-50 transition-all duration-200" onClick={() => setIsMobileMenuOpen(false)}>
+                      <UsersIcon className="w-5 h-5" />
+                      <span>Usuarios</span>
+                    </Link>
+                    <Link to="/admin/vendors" className="flex items-center space-x-2 px-3 py-2 rounded-lg text-gray-700 hover:text-primary-600 hover:bg-primary-50 transition-all duration-200" onClick={() => setIsMobileMenuOpen(false)}>
+                      <UserGroupIcon className="w-5 h-5" />
+                      <span>Vendedores</span>
+                    </Link>
+                    <Link to="/admin/products" className="flex items-center space-x-2 px-3 py-2 rounded-lg text-gray-700 hover:text-primary-600 hover:bg-primary-50 transition-all duration-200" onClick={() => setIsMobileMenuOpen(false)}>
+                      <ShoppingBagIcon className="w-5 h-5" />
+                      <span>Productos</span>
+                    </Link>
+                    <Link to="/admin/categories" className="flex items-center space-x-2 px-3 py-2 rounded-lg text-gray-700 hover:text-primary-600 hover:bg-primary-50 transition-all duration-200" onClick={() => setIsMobileMenuOpen(false)}>
+                      <TagIcon className="w-5 h-5" />
+                      <span>Categorías</span>
+                    </Link>
+                    <div className="px-3 py-1 mt-2"><span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Ventas</span></div>
+                    <Link to="/admin/orders" className="flex items-center space-x-2 px-3 py-2 rounded-lg text-gray-700 hover:text-primary-600 hover:bg-primary-50 transition-all duration-200" onClick={() => setIsMobileMenuOpen(false)}>
+                      <ClipboardDocumentListIcon className="w-5 h-5" />
+                      <span>Pedidos</span>
+                    </Link>
+                    <Link to="/admin/revenue" className="flex items-center space-x-2 px-3 py-2 rounded-lg text-gray-700 hover:text-primary-600 hover:bg-primary-50 transition-all duration-200" onClick={() => setIsMobileMenuOpen(false)}>
+                      <CurrencyDollarIcon className="w-5 h-5" />
+                      <span>Ingresos</span>
+                    </Link>
+                    <Link to="/admin/analytics" className="flex items-center space-x-2 px-3 py-2 rounded-lg text-gray-700 hover:text-primary-600 hover:bg-primary-50 transition-all duration-200" onClick={() => setIsMobileMenuOpen(false)}>
+                      <ChartBarIcon className="w-5 h-5" />
+                      <span>Analytics</span>
+                    </Link>
+                    <div className="px-3 py-1 mt-2"><span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Personal</span></div>
+                    <Link to="/admin/profile" className="flex items-center space-x-2 px-3 py-2 rounded-lg text-gray-700 hover:text-primary-600 hover:bg-primary-50 transition-all duration-200" onClick={() => setIsMobileMenuOpen(false)}>
+                      <UserIcon className="w-5 h-5" />
+                      <span>Perfil</span>
+                    </Link>
+                  </>
+                )}
+
+                {/* VENDEDOR */}
+                {isVendor() && (
+                  <>
+                    <Link to="/vendor" className="flex items-center space-x-2 px-3 py-2 rounded-lg text-gray-700 hover:text-primary-600 hover:bg-primary-50 transition-all duration-200" onClick={() => setIsMobileMenuOpen(false)}>
+                      <Squares2X2Icon className="w-5 h-5" />
+                      <span>Dashboard</span>
+                    </Link>
+                    <Link to="/vendor/products" className="flex items-center space-x-2 px-3 py-2 rounded-lg text-gray-700 hover:text-primary-600 hover:bg-primary-50 transition-all duration-200" onClick={() => setIsMobileMenuOpen(false)}>
+                      <ShoppingBagIcon className="w-5 h-5" />
+                      <span>Mis Productos</span>
+                    </Link>
+                    <Link to="/vendor/search-client" className="flex items-center space-x-2 px-3 py-2 rounded-lg text-gray-700 hover:text-primary-600 hover:bg-primary-50 transition-all duration-200" onClick={() => setIsMobileMenuOpen(false)}>
+                      <MagnifyingGlassIcon className="w-5 h-5" />
+                      <span>Buscar Cliente</span>
+                    </Link>
+                    <Link to="/vendor/orders" className="flex items-center space-x-2 px-3 py-2 rounded-lg text-gray-700 hover:text-primary-600 hover:bg-primary-50 transition-all duration-200" onClick={() => setIsMobileMenuOpen(false)}>
+                      <ClipboardDocumentListIcon className="w-5 h-5" />
+                      <span>Mis Pedidos</span>
+                    </Link>
+                    <Link to="/vendor/cart" className="flex items-center space-x-2 px-3 py-2 rounded-lg text-gray-700 hover:text-primary-600 hover:bg-primary-50 transition-all duration-200" onClick={() => setIsMobileMenuOpen(false)}>
+                      <ShoppingCartIcon className="w-5 h-5" />
+                      <span>Carrito Ventas</span>
+                    </Link>
+                    <Link to="/vendor/reports" className="flex items-center space-x-2 px-3 py-2 rounded-lg text-gray-700 hover:text-primary-600 hover:bg-primary-50 transition-all duration-200" onClick={() => setIsMobileMenuOpen(false)}>
+                      <DocumentTextIcon className="w-5 h-5" />
+                      <span>Reportes</span>
+                    </Link>
+                    <Link to="/vendor/profile" className="flex items-center space-x-2 px-3 py-2 rounded-lg text-gray-700 hover:text-primary-600 hover:bg-primary-50 transition-all duration-200" onClick={() => setIsMobileMenuOpen(false)}>
+                      <UserIcon className="w-5 h-5" />
+                      <span>Perfil</span>
+                    </Link>
+                  </>
+                )}
+
+                {/* COMPRADOR */}
+                {isBuyer() && (
+                  <>
+                    <Link to="/orders" className="flex items-center space-x-2 px-3 py-2 rounded-lg text-gray-700 hover:text-primary-600 hover:bg-primary-50 transition-all duration-200" onClick={() => setIsMobileMenuOpen(false)}>
+                      <ClipboardDocumentListIcon className="w-5 h-5" />
+                      <span>Mis Pedidos</span>
+                    </Link>
+                    <Link to="/profile" className="flex items-center space-x-2 px-3 py-2 rounded-lg text-gray-700 hover:text-primary-600 hover:bg-primary-50 transition-all duration-200" onClick={() => setIsMobileMenuOpen(false)}>
+                      <UserIcon className="w-5 h-5" />
+                      <span>Perfil</span>
+                    </Link>
+                    <Link to="/cart" className="flex items-center space-x-2 px-3 py-2 rounded-lg text-gray-700 hover:text-primary-600 hover:bg-primary-50 transition-all duration-200" onClick={() => setIsMobileMenuOpen(false)}>
+                      <ShoppingCartIcon className="w-5 h-5" />
+                      <span>Carrito {totalItems > 0 && `(${totalItems})`}</span>
+                    </Link>
+                  </>
+                )}
+
+                <div className="border-t border-gray-200 my-2"></div>
+              </>
+            )}
 
             {isAuthenticated ? (
-              <button
-                onClick={() => {
-                  handleLogout();
-                  setIsMobileMenuOpen(false);
-                }}
-                className="flex items-center space-x-2 w-full px-3 py-2 rounded-lg text-red-600 hover:bg-red-50 transition-all duration-200"
-              >
+              <button onClick={() => { handleLogout(); setIsMobileMenuOpen(false); }} className="flex items-center space-x-2 w-full px-3 py-2 rounded-lg text-red-600 hover:bg-red-50 transition-all duration-200">
                 <ArrowRightOnRectangleIcon className="w-5 h-5" />
                 <span>Cerrar Sesión</span>
               </button>
             ) : (
               <>
-                <Link
-                  to="/login"
-                  className="block px-3 py-2 rounded-lg text-primary-600 hover:bg-primary-50 transition-all duration-200"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                >
+                <Link to="/login" className="block px-3 py-2 rounded-lg text-primary-600 hover:bg-primary-50 transition-all duration-200" onClick={() => setIsMobileMenuOpen(false)}>
                   Iniciar Sesión
                 </Link>
-                <Link
-                  to="/register"
-                  className="block px-3 py-2 rounded-lg bg-primary-600 text-white hover:bg-primary-700 transition-all duration-200 text-center"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                >
+                <Link to="/register" className="block px-3 py-2 rounded-lg bg-primary-600 text-white hover:bg-primary-700 transition-all duration-200 text-center" onClick={() => setIsMobileMenuOpen(false)}>
                   Registrarse
                 </Link>
               </>
