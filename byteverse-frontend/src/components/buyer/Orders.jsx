@@ -1,29 +1,46 @@
+// src/components/buyer/Orders.jsx
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
-import { EyeIcon, XMarkIcon, CheckIcon } from '@heroicons/react/24/outline';
+import { EyeIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
 const Orders = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState(null);
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
 
   useEffect(() => {
-    fetchOrders();
-  }, []);
+    if (isAuthenticated && user) {
+      fetchOrders();
+    }
+  }, [isAuthenticated, user]);
 
   const fetchOrders = async () => {
     try {
       setLoading(true);
-      // ✅ Usar userId para filtrar
+      
+      if (!user?.id) {
+        console.warn('⚠️ Usuario sin ID');
+        setOrders([]);
+        setLoading(false);
+        return;
+      }
+
+      console.log('📦 Obteniendo pedidos para usuario:', user.id);
+      
       const response = await api.get(`/orders?userId=${user.id}`);
-      console.log('📦 Órdenes recibidas:', response.data);
-      setOrders(response.data);
+      console.log('✅ Pedidos recibidos:', response.data);
+      setOrders(response.data || []);
+      
     } catch (error) {
       console.error('❌ Error fetching orders:', error);
-      toast.error('Error al cargar tus pedidos');
+      if (error.response?.status !== 404) {
+        toast.error('Error al cargar tus pedidos');
+      }
+      setOrders([]);
     } finally {
       setLoading(false);
     }
@@ -31,13 +48,13 @@ const Orders = () => {
 
   const getStatusColor = (status) => {
     const colors = {
-      'PENDIENTE': 'badge-warning',
-      'CONFIRMADO': 'badge-success',
-      'ENVIADO': 'badge-info',
-      'ENTREGADO': 'badge-success',
-      'CANCELADO': 'badge-danger'
+      'PENDIENTE': 'bg-yellow-100 text-yellow-800',
+      'CONFIRMADO': 'bg-blue-100 text-blue-800',
+      'ENVIADO': 'bg-purple-100 text-purple-800',
+      'ENTREGADO': 'bg-green-100 text-green-800',
+      'CANCELADO': 'bg-red-100 text-red-800'
     };
-    return colors[status] || 'badge-info';
+    return colors[status] || 'bg-gray-100 text-gray-800';
   };
 
   const getStatusText = (status) => {
@@ -64,6 +81,19 @@ const Orders = () => {
     }
   };
 
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-gray-600">Debes iniciar sesión para ver tus pedidos</p>
+          <Link to="/login" className="btn-primary inline-block mt-4">
+            Iniciar Sesión
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -75,16 +105,27 @@ const Orders = () => {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">Mis Pedidos</h1>
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Mis Pedidos</h1>
+            <p className="text-gray-600 mt-2">Historial de todas tus compras</p>
+          </div>
+          <button
+            onClick={fetchOrders}
+            className="btn-secondary flex items-center gap-2"
+          >
+            <span>↻</span> Recargar
+          </button>
+        </div>
         
         {orders.length === 0 ? (
           <div className="bg-white rounded-2xl shadow-xl p-12 text-center">
             <div className="text-6xl mb-6">📦</div>
             <h2 className="text-2xl font-bold text-gray-900 mb-4">No tienes pedidos</h2>
             <p className="text-gray-600 mb-8">Realiza tu primera compra y revisa tus pedidos aquí</p>
-            <a href="/products" className="btn-primary inline-block">
+            <Link to="/products" className="btn-primary inline-block">
               Ver Productos
-            </a>
+            </Link>
           </div>
         ) : (
           <div className="space-y-6">
@@ -102,7 +143,7 @@ const Orders = () => {
                         </span>
                         {order.estado === 'PENDIENTE' && (
                           <button
-                            onClick={() => handleCancelOrder(order.id)}
+                            onClick={() => handleCancelOrder(order.id || order._id)}
                             className="text-red-600 hover:text-red-800 text-sm font-medium"
                           >
                             Cancelar
@@ -157,7 +198,7 @@ const Orders = () => {
                     </button>
                     {order.estado === 'PENDIENTE' && (
                       <button
-                        onClick={() => handleCancelOrder(order.id)}
+                        onClick={() => handleCancelOrder(order.id || order._id)}
                         className="btn-danger text-sm px-4 py-2 flex items-center gap-2"
                       >
                         <XMarkIcon className="w-4 h-4" />
@@ -190,7 +231,7 @@ const Orders = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-gray-500">Número</p>
-                  <p className="font-medium">{selectedOrder.id?.slice(0, 8)}</p>
+                  <p className="font-medium">{selectedOrder.id?.slice(0, 8) || selectedOrder._id?.slice(0, 8)}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Estado</p>
@@ -205,8 +246,8 @@ const Orders = () => {
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500">Boleta</p>
-                  <p className="font-medium">{selectedOrder.boletaNumero || 'N/A'}</p>
+                  <p className="text-sm text-gray-500">Vendedor</p>
+                  <p className="font-medium">{selectedOrder.vendedorNombre || 'ByteVerse'}</p>
                 </div>
               </div>
               
