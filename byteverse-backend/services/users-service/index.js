@@ -1,4 +1,3 @@
-//services\users-service\index.js
 const express = require('express');
 const mongoose = require('mongoose');
 const amqp = require('amqplib');
@@ -11,7 +10,8 @@ const PORT = process.env.PORT || 3004;
 app.use(cors());
 app.use(express.json());
 
-// Modelo de Usuario
+// ==================== MODELO DE USUARIO ACTUALIZADO ====================
+// ✅ AÑADIDO: telefono, direccion (string), documento, tipoDocumento, descripcion, categorias, comision
 const UserSchema = new mongoose.Schema({
   _id: { type: mongoose.Schema.Types.ObjectId, required: true },
   nombre: String,
@@ -19,16 +19,17 @@ const UserSchema = new mongoose.Schema({
   role: String,
   activo: Boolean,
   fechaRegistro: Date,
-  direccion: {
-    departamento: String,
-    provincia: String,
-    distrito: String,
-    linea: String,
-    referencia: String
-  },
+  // ✅ NUEVOS CAMPOS
+  telefono: { type: String, default: '' },
+  direccion: { type: String, default: '' },
+  documento: { type: String, default: '' },
+  tipoDocumento: { type: String, default: 'DNI' },
+  descripcion: { type: String, default: '' },
+  categorias: [{ type: String }],
+  comision: { type: Number, default: 10 },
+  // Campos existentes
   tienda: String,
   ruc: String,
-  telefono: String,
   ultimoAcceso: Date,
   ventasRealizadas: { type: Number, default: 0 },
   totalVentas: { type: Number, default: 0 },
@@ -88,6 +89,13 @@ async function handleUserSync(userData) {
           role: userData.role,
           activo: userData.activo,
           fechaRegistro: userData.fechaRegistro,
+          telefono: userData.telefono || '',
+          direccion: userData.direccion || '',
+          documento: userData.documento || '',
+          tipoDocumento: userData.tipoDocumento || 'DNI',
+          descripcion: userData.descripcion || '',
+          categorias: userData.categorias || [],
+          comision: userData.comision || 10,
           syncStatus: 'SYNCED'
         }
       );
@@ -100,6 +108,13 @@ async function handleUserSync(userData) {
         role: userData.role,
         activo: userData.activo,
         fechaRegistro: userData.fechaRegistro,
+        telefono: userData.telefono || '',
+        direccion: userData.direccion || '',
+        documento: userData.documento || '',
+        tipoDocumento: userData.tipoDocumento || 'DNI',
+        descripcion: userData.descripcion || '',
+        categorias: userData.categorias || [],
+        comision: userData.comision || 10,
         syncStatus: 'SYNCED'
       });
       console.log(`✅ Usuario creado: ${userData.email}`);
@@ -121,16 +136,25 @@ async function handleUserSync(userData) {
   }
 }
 
-// ENDPOINTS
+// ==================== ENDPOINTS ====================
+
+// Obtener todos los usuarios
 app.get('/users', async (req, res) => {
   try {
-    const users = await User.find();
+    const { role, documento, activo } = req.query;
+    const query = {};
+    if (role) query.role = role;
+    if (documento) query.documento = documento;
+    if (activo !== undefined) query.activo = activo === 'true';
+    
+    const users = await User.find(query);
     res.json(users);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
+// Obtener usuario por ID
 app.get('/users/:id', async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
@@ -143,28 +167,55 @@ app.get('/users/:id', async (req, res) => {
   }
 });
 
+// Actualizar usuario
 app.put('/users/:id', async (req, res) => {
   try {
+    const updateData = req.body;
+    // No permitir actualizar _id o email
+    delete updateData._id;
+    delete updateData.email;
+    
     const user = await User.findByIdAndUpdate(
       req.params.id,
-      req.body,
-      { new: true }
+      { $set: updateData },
+      { new: true, runValidators: true }
     );
+    
     if (!user) {
       return res.status(404).json({ error: 'Usuario no encontrado' });
     }
-    res.json(user);
+    
+    res.json({ success: true, user });
+  } catch (error) {
+    console.error('❌ Error actualizando usuario:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Eliminar usuario
+app.delete('/users/:id', async (req, res) => {
+  try {
+    const user = await User.findByIdAndDelete(req.params.id);
+    if (!user) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+    res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
+// Health check
 app.get('/health', (req, res) => {
-  res.json({ status: 'OK', service: 'users-service' });
+  res.json({ 
+    status: 'OK', 
+    service: 'users-service',
+    mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
+  });
 });
 
 connectRabbitMQ().then(() => {
-  app.listen(PORT, () => {
+  app.listen(PORT, '0.0.0.0', () => {
     console.log(`✅ Users Service running on port ${PORT}`);
   });
 });
