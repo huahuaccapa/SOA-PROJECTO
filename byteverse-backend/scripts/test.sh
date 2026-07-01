@@ -24,9 +24,10 @@ test_service() {
     fi
 }
 
-echo "📡 Probando servicios..."
+echo "📡 Probando servicios (17 servicios)..."
 echo ""
 
+# Servicios existentes
 test_service "API Gateway" "http://localhost:3000/health"
 test_service "Auth" "http://localhost:3001/health"
 test_service "Products" "http://localhost:3002/health"
@@ -41,6 +42,10 @@ test_service "Reviews" "http://localhost:3010/health"
 test_service "Wishlist" "http://localhost:3011/health"
 test_service "Coupons" "http://localhost:3012/health"
 test_service "Audit" "http://localhost:3013/health"
+
+# ✅ NUEVOS SERVICIOS
+test_service "Categories" "http://localhost:3014/health"
+test_service "Vendor Cart" "http://localhost:3015/health"
 
 echo ""
 echo "=========================================="
@@ -82,6 +87,34 @@ if [ "$PRODUCTS" = "200" ]; then
     echo -e "${GREEN}✅ OK${NC}"
 else
     echo -e "${RED}❌ FAIL (HTTP $PRODUCTS)${NC}"
+fi
+
+echo ""
+echo "=========================================="
+echo "📂 Categories vía Gateway"
+echo "=========================================="
+
+echo -n "  GET /api/categories... "
+CATEGORIES=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/api/categories)
+if [ "$CATEGORIES" = "200" ]; then
+    echo -e "${GREEN}✅ OK${NC}"
+else
+    echo -e "${RED}❌ FAIL (HTTP $CATEGORIES)${NC}"
+fi
+
+echo ""
+echo "=========================================="
+echo "🛒 Vendor Cart vía Gateway"
+echo "=========================================="
+
+echo -n "  POST /api/vendor/cart... "
+CART_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -X POST http://localhost:3000/api/vendor/cart \
+    -H "Content-Type: application/json" \
+    -d '{"vendorId":"67a1b2c3d4e5f67890abcdef","productId":"test123","nombre":"Producto Test","precio":99.99,"cantidad":1}')
+if [ "$CART_RESPONSE" = "200" ] || [ "$CART_RESPONSE" = "201" ]; then
+    echo -e "${GREEN}✅ OK${NC}"
+else
+    echo -e "${RED}❌ FAIL (HTTP $CART_RESPONSE)${NC}"
 fi
 
 echo ""
