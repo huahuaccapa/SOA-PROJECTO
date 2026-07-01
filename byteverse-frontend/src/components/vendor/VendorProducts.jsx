@@ -43,11 +43,11 @@ const VendorProducts = () => {
     fetchCategories();
   }, []);
 
+  // ✅ ACTUALIZADO: vendorId → vendedorId
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      // ✅ Obtener solo productos del vendedor autenticado
-      const response = await api.get(`/products?vendorId=${user.id}`);
+      const response = await api.get(`/products?vendedorId=${user.id}`);
       setProducts(response.data);
       console.log('✅ Productos del vendedor:', response.data.length);
     } catch (error) {
@@ -93,7 +93,7 @@ const VendorProducts = () => {
     }
   };
 
-  // ✅ Crear o actualizar producto (sin eliminar)
+  // ✅ ACTUALIZADO: Crear o actualizar producto
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -130,11 +130,9 @@ const VendorProducts = () => {
       };
 
       if (editingProduct) {
-        // ✅ Actualizar producto (no eliminar)
         await api.put(`/products/${editingProduct._id}`, productData);
         toast.success('Producto actualizado');
       } else {
-        // ✅ Crear producto
         await api.post('/products', productData);
         toast.success('Producto creado');
       }
@@ -179,7 +177,6 @@ const VendorProducts = () => {
     setShowModal(true);
   };
 
-  // ❌ VENDEDOR NO PUEDE ELIMINAR - Solo desactivar
   const handleToggleActive = async (product) => {
     try {
       const newStatus = !product.activo;
