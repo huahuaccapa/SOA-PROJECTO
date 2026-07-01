@@ -1,4 +1,3 @@
-//services\auth-service\index.js
 const express = require('express');
 const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
@@ -15,7 +14,8 @@ app.use(express.json());
 
 console.log('🚀 Auth Service iniciando...');
 
-// Modelo de Usuario
+// ==================== MODELO DE USUARIO ACTUALIZADO ====================
+// ✅ AÑADIDO: telefono, direccion, documento, tipoDocumento, descripcion, categorias, comision
 const UserSchema = new mongoose.Schema({
   nombre: { type: String, required: true },
   email: { type: String, required: true, unique: true },
@@ -28,7 +28,15 @@ const UserSchema = new mongoose.Schema({
   activo: { type: Boolean, default: true },
   fechaRegistro: { type: Date, default: Date.now },
   needPasswordChange: { type: Boolean, default: false },
-  refreshToken: { type: String }
+  refreshToken: { type: String },
+  // ✅ NUEVOS CAMPOS
+  telefono: { type: String, default: '' },
+  direccion: { type: String, default: '' },
+  documento: { type: String, default: '' },
+  tipoDocumento: { type: String, enum: ['DNI', 'RUC', 'CE', 'PASAPORTE'], default: 'DNI' },
+  descripcion: { type: String, default: '' },
+  categorias: [{ type: String }],
+  comision: { type: Number, default: 10 }
 });
 
 const User = mongoose.model('User', UserSchema);
@@ -74,14 +82,20 @@ async function createDefaultUsers() {
       email: 'admin@byteverse.com',
       password: await bcrypt.hash('123456', 10),
       role: 'ADMIN',
-      activo: true
+      activo: true,
+      telefono: '999888777',
+      direccion: 'Lima, Perú'
     },
     {
       nombre: 'Usuario Comprador',
       email: 'comprador@byteverse.com',
       password: await bcrypt.hash('123456', 10),
       role: 'COMPRADOR',
-      activo: true
+      activo: true,
+      telefono: '999111222',
+      direccion: 'Av. Siempre Viva 123',
+      documento: '12345678',
+      tipoDocumento: 'DNI'
     },
     {
       nombre: 'Vendedor Tech',
@@ -89,14 +103,23 @@ async function createDefaultUsers() {
       password: await bcrypt.hash('123456', 10),
       role: 'VENDEDOR',
       activo: true,
-      needPasswordChange: true
+      needPasswordChange: true,
+      telefono: '999333444',
+      direccion: 'Calle Tecnológica 456',
+      documento: '87654321',
+      tipoDocumento: 'RUC',
+      descripcion: 'Venta de productos tecnológicos',
+      categorias: ['Laptops', 'Smartphones', 'Tablets'],
+      comision: 10
     },
     {
       nombre: 'Usuario Demo',
       email: 'user@byteverse.com',
       password: await bcrypt.hash('123456', 10),
       role: 'COMPRADOR',
-      activo: true
+      activo: true,
+      telefono: '999555666',
+      direccion: 'Calle Demo 789'
     }
   ];
 
@@ -127,16 +150,18 @@ async function syncUserToUsersService(user) {
       email: user.email,
       role: user.role,
       activo: user.activo,
-      fechaRegistro: user.fechaRegistro
+      fechaRegistro: user.fechaRegistro,
+      telefono: user.telefono || '',
+      direccion: user.direccion || '',
+      documento: user.documento || '',
+      tipoDocumento: user.tipoDocumento || 'DNI',
+      descripcion: user.descripcion || '',
+      categorias: user.categorias || [],
+      comision: user.comision || 10
     };
 
     await channel.sendToQueue('user_sync_queue', Buffer.from(JSON.stringify(userData)), { persistent: true });
     console.log(`📤 Usuario enviado a sincronización: ${user.email}`);
-    
-    await User.findByIdAndUpdate(user._id, {
-      syncStatus: 'PENDING',
-      lastSyncAttempt: new Date()
-    });
 
     return true;
   } catch (error) {
@@ -145,7 +170,7 @@ async function syncUserToUsersService(user) {
   }
 }
 
-// ENDPOINTS
+// ==================== ENDPOINTS ====================
 
 // Health check
 app.get('/health', (req, res) => {
@@ -218,7 +243,15 @@ app.post('/login', async (req, res) => {
         nombre: user.nombre,
         email: user.email,
         role: user.role,
-        needPasswordChange: user.needPasswordChange || false
+        needPasswordChange: user.needPasswordChange || false,
+        telefono: user.telefono || '',
+        direccion: user.direccion || '',
+        documento: user.documento || '',
+        tipoDocumento: user.tipoDocumento || 'DNI',
+        descripcion: user.descripcion || '',
+        categorias: user.categorias || [],
+        comision: user.comision || 10,
+        activo: user.activo
       }
     });
   } catch (error) {
@@ -230,7 +263,7 @@ app.post('/login', async (req, res) => {
 // Registro
 app.post('/register', async (req, res) => {
   try {
-    const { nombre, email, password, role } = req.body;
+    const { nombre, email, password, role, telefono, direccion, documento, tipoDocumento } = req.body;
     
     const existing = await User.findOne({ email });
     if (existing) {
@@ -242,7 +275,13 @@ app.post('/register', async (req, res) => {
       nombre,
       email,
       password: hashedPassword,
-      role: role || 'COMPRADOR'
+      role: role || 'COMPRADOR',
+      telefono: telefono || '',
+      direccion: direccion || '',
+      documento: documento || '',
+      tipoDocumento: tipoDocumento || 'DNI',
+      categorias: [],
+      comision: 10
     });
     
     await user.save();
@@ -268,7 +307,11 @@ app.post('/register', async (req, res) => {
         id: user._id,
         nombre: user.nombre,
         email: user.email,
-        role: user.role
+        role: user.role,
+        telefono: user.telefono,
+        direccion: user.direccion,
+        documento: user.documento,
+        tipoDocumento: user.tipoDocumento
       }
     });
   } catch (error) {
