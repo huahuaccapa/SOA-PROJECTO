@@ -47,11 +47,12 @@ const VendorProfile = () => {
     fetchStats();
   }, [user]);
 
+  // ✅ ACTUALIZADO: vendorId → vendedorId
   const fetchStats = async () => {
     try {
       const [productsRes, ordersRes] = await Promise.all([
-        api.get(`/products?vendorId=${user.id}`),
-        api.get(`/orders?vendorId=${user.id}`)
+        api.get(`/products?vendedorId=${user.id}`),
+        api.get(`/orders?vendedorId=${user.id}`)
       ]);
 
       const products = productsRes.data || [];
