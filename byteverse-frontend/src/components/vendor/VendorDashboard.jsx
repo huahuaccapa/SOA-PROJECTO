@@ -31,12 +31,13 @@ const VendorDashboard = () => {
     fetchStats();
   }, []);
 
+  // ✅ ACTUALIZADO: vendorId → vendedorId
   const fetchStats = async () => {
     try {
       setLoading(true);
       
       // Obtener productos del vendedor
-      const productsRes = await api.get(`/products?vendorId=${user.id}`);
+      const productsRes = await api.get(`/products?vendedorId=${user.id}`);
       const products = productsRes.data || [];
       
       // Obtener pedidos del vendedor
