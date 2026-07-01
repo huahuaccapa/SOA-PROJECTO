@@ -288,6 +288,36 @@ services:
     networks:
       - byteverse-network
 
+  # ✅ NUEVO: CATEGORIES SERVICE
+  categories-service:
+    build: ./services/categories-service
+    container_name: categories-service
+    ports:
+      - "3014:3014"
+    environment:
+      - NODE_ENV=production
+      - MONGODB_URI=mongodb://admin:password@mongodb:27017/byteverse?authSource=admin
+    depends_on:
+      mongodb:
+        condition: service_started
+    networks:
+      - byteverse-network
+
+  # ✅ NUEVO: VENDOR CART SERVICE
+  vendor-cart-service:
+    build: ./services/vendor-cart-service
+    container_name: vendor-cart-service
+    ports:
+      - "3015:3015"
+    environment:
+      - NODE_ENV=production
+      - MONGODB_URI=mongodb://admin:password@mongodb:27017/byteverse?authSource=admin
+    depends_on:
+      mongodb:
+        condition: service_started
+    networks:
+      - byteverse-network
+
 volumes:
   mongodb_data:
     driver: local
