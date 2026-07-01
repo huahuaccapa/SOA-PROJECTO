@@ -15,11 +15,11 @@ const VendorOrders = () => {
     fetchOrders();
   }, []);
 
+  // ✅ ACTUALIZADO: vendorId → vendedorId
   const fetchOrders = async () => {
     try {
       setLoading(true);
-      // ✅ Obtener pedidos del vendedor autenticado
-      const response = await api.get(`/orders?vendorId=${user.id}`);
+      const response = await api.get(`/orders?vendedorId=${user.id}`);
       setOrders(response.data);
       console.log('✅ Pedidos del vendedor:', response.data.length);
     } catch (error) {
