@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel
@@ -42,19 +42,19 @@ async def connect_rabbitmq():
         return None
 
 # ==================== MODELOS ACTUALIZADOS ====================
-# ✅ Cambio: vendedorId ahora es str (ObjectId)
 class ProductCreate(BaseModel):
     nombre: str
-    descripcion: str
+    descripcion: Optional[str] = ""
     precio: float
     stock: int
-    categoria: str
-    imagen: Optional[str] = None
+    categoria: Optional[str] = ""
+    imagen: Optional[str] = ""
     caracteristicas: List[str] = []
-    vendedorId: str  # ✅ String para ObjectId
+    vendedorId: str
     vendedorNombre: str
     tieneIGV: bool = True
     deliveryGratis: bool = False
+    activo: bool = True  # ✅ NUEVO
 
 class ProductUpdate(BaseModel):
     nombre: Optional[str] = None
@@ -66,6 +66,7 @@ class ProductUpdate(BaseModel):
     imagen: Optional[str] = None
     caracteristicas: Optional[List[str]] = None
     deliveryGratis: Optional[bool] = None
+    tieneIGV: Optional[bool] = None
 
 # ==================== DATOS POR DEFECTO ====================
 async def create_default_products():
@@ -78,7 +79,7 @@ async def create_default_products():
             "categoria": "Laptops",
             "imagen": "https://images.unsplash.com/photo-1496181133206-80ce9b88a853?w=300&h=200&fit=crop",
             "caracteristicas": ["Intel Core i7", "16GB RAM", "RTX 4060", "1TB SSD"],
-            "vendedorId": "67a1b2c3d4e5f67890abcdef",  # ✅ String
+            "vendedorId": "67a1b2c3d4e5f67890abcdef",
             "vendedorNombre": "TechStore Perú",
             "activo": True,
             "tieneIGV": True,
@@ -93,7 +94,7 @@ async def create_default_products():
             "categoria": "Smartphones",
             "imagen": "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=300&h=200&fit=crop",
             "caracteristicas": ["Pantalla 6.7\"", "Chip A17 Pro", "Cámara 48MP"],
-            "vendedorId": "67a1b2c3d4e5f67890abcdef",  # ✅ String
+            "vendedorId": "67a1b2c3d4e5f67890abcdef",
             "vendedorNombre": "TechStore Perú",
             "activo": True,
             "tieneIGV": True,
@@ -148,21 +149,25 @@ async def health():
         "mongodb": "connected"
     }
 
-# ✅ OBTENER PRODUCTOS
+# ✅ OBTENER PRODUCTOS - CON FILTRO POR VENDEDOR
 @app.get("/products")
-async def get_products(categoria: Optional[str] = None, activo: Optional[bool] = True):
+async def get_products(
+    categoria: Optional[str] = None, 
+    activo: Optional[bool] = True,
+    vendedorId: Optional[str] = None
+):
     query = {}
     if categoria:
         query["categoria"] = categoria
     if activo is not None:
         query["activo"] = activo
+    if vendedorId:
+        query["vendedorId"] = vendedorId
     
     products = await products_collection.find(query).to_list(length=100)
     
-    # ✅ Formatear respuesta con _id como string
     for product in products:
         product["_id"] = str(product["_id"])
-        # Asegurar que vendedorId sea string
         if "vendedorId" in product:
             product["vendedorId"] = str(product["vendedorId"])
     
@@ -189,7 +194,7 @@ async def create_product(product: ProductCreate):
         product_data = product.dict()
         product_data["activo"] = True
         product_data["fechaCreacion"] = datetime.now().isoformat()
-        product_data["vendedorId"] = str(product_data["vendedorId"])  # ✅ Asegurar string
+        product_data["vendedorId"] = str(product_data["vendedorId"])
         
         result = await products_collection.insert_one(product_data)
         product_data["_id"] = str(result.inserted_id)
@@ -251,7 +256,7 @@ async def delete_product(product_id: str):
 @app.get("/products/vendor/{vendor_id}")
 async def get_products_by_vendor(vendor_id: str):
     try:
-        products = await products_collection.find({"vendedorId": vendor_id, "activo": True}).to_list(length=100)
+        products = await products_collection.find({"vendedorId": vendor_id}).to_list(length=100)
         for product in products:
             product["_id"] = str(product["_id"])
         return products
