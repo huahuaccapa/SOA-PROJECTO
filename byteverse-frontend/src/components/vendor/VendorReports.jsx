@@ -9,7 +9,9 @@ import {
   ArrowTrendingUpIcon,
   ArrowTrendingDownIcon,
   DocumentArrowDownIcon,
-  CalendarIcon
+  CalendarIcon,
+  ShoppingBagIcon,
+  ClockIcon
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
@@ -36,11 +38,11 @@ const VendorReports = () => {
     fetchReports();
   }, [dateRange]);
 
+  // ✅ ACTUALIZADO: vendorId → vendedorId
   const fetchReports = async () => {
     setLoading(true);
     try {
-      // ✅ Obtener pedidos del vendedor
-      const ordersRes = await api.get(`/orders?vendorId=${user.id}`);
+      const ordersRes = await api.get(`/orders?vendedorId=${user.id}`);
       const orders = ordersRes.data || [];
 
       // Filtrar por fecha
