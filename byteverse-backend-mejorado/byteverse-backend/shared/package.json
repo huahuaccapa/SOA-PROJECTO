@@ -1,0 +1,9 @@
+{
+  "name": "@byteverse/shared",
+  "version": "1.0.0",
+  "private": true,
+  "type": "commonjs",
+  "dependencies": {
+    "winston": "^3.17.0"
+  }
+}

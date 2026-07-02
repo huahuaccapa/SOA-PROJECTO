@@ -1,0 +1,16 @@
+{
+  "name": "byteverse-backend",
+  "version": "1.1.0",
+  "private": true,
+  "description": "Backend de microservicios para ByteVerse",
+  "scripts": {
+    "start": "docker compose up -d --build",
+    "stop": "docker compose down",
+    "logs": "docker compose logs -f --tail=100",
+    "status": "docker compose ps",
+    "health": "node scripts/health-check.js",
+    "validate": "node scripts/validate.js"
+  },
+  "license": "ISC",
+  "type": "commonjs"
+}

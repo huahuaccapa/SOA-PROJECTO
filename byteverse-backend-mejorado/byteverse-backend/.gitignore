@@ -1,0 +1,7 @@
+.env
+**/node_modules/
+**/__pycache__/
+*.pyc
+logs/
+api-gateway/uploads/
+.DS_Store
