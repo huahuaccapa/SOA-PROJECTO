@@ -1,0 +1,373 @@
+services:
+  # Message Queue
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
+    networks:
+      - byteverse-network
+    healthcheck:
+      test: ["CMD", "rabbitmqctl", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MongoDB
+  mongodb:
+    image: mongo:6.0
+    container_name: mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password
+      MONGO_INITDB_DATABASE: byteverse
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - byteverse-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--username", "admin", "--password", "password", "--authenticationDatabase", "admin", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  # Redis
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks:
+      - byteverse-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # API GATEWAY
+  api-gateway:
+    build: ./api-gateway
+    container_name: api-gateway
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - JWT_SECRET=byteverse_secret_key_2024
+      - REFRESH_SECRET=byteverse_refresh_secret_2024
+      - FRONTEND_URL=http://localhost:5173
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - byteverse-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  # AUTH SERVICE
+  auth-service:
+    build: ./services/auth-service
+    container_name: auth-service
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - JWT_SECRET=byteverse_secret_key_2024
+      - REFRESH_SECRET=byteverse_refresh_secret_2024
+      - MONGODB_URI=mongodb://admin:password@mongodb:27017/byteverse?authSource=admin
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:5173}
+      - GOOGLE_CLIENT_ID=765528287121-88mllq5oksjrkfbins18bi90lq4j22ku.apps.googleusercontent.com
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - GOOGLE_CALLBACK_URL=${GOOGLE_CALLBACK_URL:-http://localhost:3000/api/auth/google/callback}
+      - OAUTH_STATE_SECRET=${OAUTH_STATE_SECRET:-byteverse_oauth_state_change_me}
+      - COOKIE_SECURE=${COOKIE_SECURE:-false}
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - byteverse-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # USERS SERVICE
+  users-service:
+    build: ./services/users-service
+    container_name: users-service
+    restart: unless-stopped
+    ports:
+      - "3004:3004"
+    environment:
+      - NODE_ENV=production
+      - MONGODB_URI=mongodb://admin:password@mongodb:27017/byteverse?authSource=admin
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - byteverse-network
+
+  # PRODUCTS SERVICE
+  products-service:
+    build: ./services/products-service
+    container_name: products-service
+    restart: unless-stopped
+    ports:
+      - "3002:3002"
+    environment:
+      - MONGODB_URI=mongodb://admin:password@mongodb:27017/byteverse?authSource=admin
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - byteverse-network
+
+  # ORDERS SERVICE
+  orders-service:
+    build: ./services/orders-service
+    container_name: orders-service
+    restart: unless-stopped
+    ports:
+      - "3003:3003"
+    environment:
+      - NODE_ENV=production
+      - MONGODB_URI=mongodb://admin:password@mongodb:27017/byteverse?authSource=admin
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - byteverse-network
+
+  # NOTIFICATIONS SERVICE
+  notifications-service:
+    build: ./services/notifications-service
+    container_name: notifications-service
+    restart: unless-stopped
+    ports:
+      - "3005:3005"
+    environment:
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - byteverse-network
+
+  # ANALYTICS SERVICE
+  analytics-service:
+    build: ./services/analytics-service
+    container_name: analytics-service
+    restart: unless-stopped
+    ports:
+      - "3006:3006"
+    environment:
+      - NODE_ENV=production
+      - MONGODB_URI=mongodb://admin:password@mongodb:27017/byteverse?authSource=admin
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - byteverse-network
+
+  # INVENTORY SERVICE
+  inventory-service:
+    build: ./services/inventory-service
+    container_name: inventory-service
+    restart: unless-stopped
+    ports:
+      - "3007:3007"
+    environment:
+      - NODE_ENV=production
+      - MONGODB_URI=mongodb://admin:password@mongodb:27017/byteverse?authSource=admin
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - byteverse-network
+
+  # PAYMENT SERVICE
+  payment-service:
+    build: ./services/payment-service
+    container_name: payment-service
+    restart: unless-stopped
+    ports:
+      - "3008:3008"
+    environment:
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-sk_test_...}
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - byteverse-network
+
+  # SHIPPING SERVICE
+  shipping-service:
+    build: ./services/shipping-service
+    container_name: shipping-service
+    restart: unless-stopped
+    ports:
+      - "3009:3009"
+    environment:
+      - NODE_ENV=production
+      - MONGODB_URI=mongodb://admin:password@mongodb:27017/byteverse?authSource=admin
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - byteverse-network
+
+  # REVIEW SERVICE
+  review-service:
+    build: ./services/review-service
+    container_name: review-service
+    restart: unless-stopped
+    ports:
+      - "3010:3010"
+    environment:
+      - NODE_ENV=production
+      - MONGODB_URI=mongodb://admin:password@mongodb:27017/byteverse?authSource=admin
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - byteverse-network
+
+  # WISHLIST SERVICE
+  wishlist-service:
+    build: ./services/wishlist-service
+    container_name: wishlist-service
+    restart: unless-stopped
+    ports:
+      - "3011:3011"
+    environment:
+      - NODE_ENV=production
+      - MONGODB_URI=mongodb://admin:password@mongodb:27017/byteverse?authSource=admin
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - byteverse-network
+
+  # COUPON SERVICE
+  coupon-service:
+    build: ./services/coupon-service
+    container_name: coupon-service
+    restart: unless-stopped
+    ports:
+      - "3012:3012"
+    environment:
+      - NODE_ENV=production
+      - MONGODB_URI=mongodb://admin:password@mongodb:27017/byteverse?authSource=admin
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - byteverse-network
+
+  # AUDIT SERVICE
+  audit-service:
+    build: ./services/audit-service
+    container_name: audit-service
+    restart: unless-stopped
+    ports:
+      - "3013:3013"
+    environment:
+      - NODE_ENV=production
+      - MONGODB_URI=mongodb://admin:password@mongodb:27017/byteverse?authSource=admin
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - byteverse-network
+
+  # ✅ NUEVO: CATEGORIES SERVICE
+  categories-service:
+    build: ./services/categories-service
+    container_name: categories-service
+    restart: unless-stopped
+    ports:
+      - "3014:3014"
+    environment:
+      - NODE_ENV=production
+      - MONGODB_URI=mongodb://admin:password@mongodb:27017/byteverse?authSource=admin
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - byteverse-network
+
+  # ✅ NUEVO: VENDOR CART SERVICE
+  vendor-cart-service:
+    build: ./services/vendor-cart-service
+    container_name: vendor-cart-service
+    restart: unless-stopped
+    ports:
+      - "3015:3015"
+    environment:
+      - NODE_ENV=production
+      - MONGODB_URI=mongodb://admin:password@mongodb:27017/byteverse?authSource=admin
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - byteverse-network
+
+volumes:
+  mongodb_data:
+    driver: local
+
+networks:
+  byteverse-network:
+    driver: bridge
