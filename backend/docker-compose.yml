@@ -1,0 +1,402 @@
+services:
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: rabbitmq
+    restart: unless-stopped
+    ports:
+    - 5672:5672
+    - 15672:15672
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
+    networks:
+    - byteverse-network
+    healthcheck:
+      test:
+      - CMD
+      - rabbitmqctl
+      - status
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: unless-stopped
+    ports:
+    - 6379:6379
+    networks:
+    - byteverse-network
+    healthcheck:
+      test:
+      - CMD
+      - redis-cli
+      - ping
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    environment: []
+  api-gateway:
+    build: ./api-gateway
+    container_name: api-gateway
+    restart: unless-stopped
+    ports:
+    - 3000:3000
+    environment:
+    - NODE_ENV=production
+    - JWT_SECRET=${JWT_SECRET:-secret}
+    - REFRESH_SECRET=${REFRESH_SECRET:-refresh_secret}
+    - FRONTEND_URL=${FRONTEND_URL:-http://localhost:5173}
+    - RABBITMQ_URL=amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672
+    - STORAGE_PROVIDER=${STORAGE_PROVIDER:-local}
+    - CLOUDINARY_CLOUD_NAME=${CLOUDINARY_CLOUD_NAME:-}
+    - CLOUDINARY_API_KEY=${CLOUDINARY_API_KEY:-}
+    - CLOUDINARY_API_SECRET=${CLOUDINARY_API_SECRET:-}
+    - CLOUDINARY_FOLDER=${CLOUDINARY_FOLDER:-byteverse}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+    volumes:
+    - api_gateway_uploads:/app/uploads
+    networks:
+    - byteverse-network
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - node -e "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 10s
+      timeout: 5s
+      retries: 8
+      start_period: 15s
+  auth-service:
+    build: ./services/auth-service
+    container_name: auth-service
+    restart: unless-stopped
+    ports:
+    - 3001:3001
+    environment:
+    - NODE_ENV=production
+    - JWT_SECRET=${JWT_SECRET:-secret}
+    - REFRESH_SECRET=${REFRESH_SECRET:-refresh_secret}
+    - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-15m}
+    - REFRESH_EXPIRES_IN=${REFRESH_EXPIRES_IN:-7d}
+    - MYSQL_HOST=${MYSQL_HOST:-host.docker.internal}
+    - MYSQL_PORT=3306
+    - MYSQL_USER=${MYSQL_USER:-root}
+    - MYSQL_PASSWORD=${MYSQL_PASSWORD:-250520}
+    - MYSQL_DATABASE=${MYSQL_DATABASE:-byteverse_db}
+    - RABBITMQ_URL=amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672
+    - FRONTEND_URL=${FRONTEND_URL:-http://localhost:5173}
+    - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-765528287121-88mllq5oksjrkfbins18bi90lq4j22ku.apps.googleusercontent.com}
+    - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+    - GOOGLE_CALLBACK_URL=${GOOGLE_CALLBACK_URL:-http://localhost:3000/api/auth/google/callback}
+    - OAUTH_STATE_SECRET=${OAUTH_STATE_SECRET}
+    - COOKIE_SECURE=${COOKIE_SECURE:-false}
+    - SMTP_HOST=${SMTP_HOST:-smtp.gmail.com}
+    - SMTP_PORT=${SMTP_PORT:-587}
+    - SMTP_SECURE=${SMTP_SECURE:-false}
+    - SMTP_USER=${SMTP_USER:-}
+    - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+    - MAIL_FROM=${MAIL_FROM:-ByteVerse <no-reply@byteverse.com>}
+    - RESET_TOKEN_MINUTES=${RESET_TOKEN_MINUTES:-30}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+    - byteverse-network
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - node -e "fetch('http://127.0.0.1:3001/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    extra_hosts:
+    - host.docker.internal:host-gateway
+  users-service:
+    build: ./services/users-service
+    container_name: users-service
+    restart: unless-stopped
+    ports:
+    - 3004:3004
+    environment:
+    - NODE_ENV=production
+    - MYSQL_HOST=${MYSQL_HOST:-host.docker.internal}
+    - MYSQL_PORT=3306
+    - MYSQL_USER=${MYSQL_USER:-root}
+    - MYSQL_PASSWORD=${MYSQL_PASSWORD:-250520}
+    - MYSQL_DATABASE=${MYSQL_DATABASE:-byteverse_db}
+    - RAPIDAPI_KEY=${RAPIDAPI_KEY:-}
+    - RABBITMQ_URL=amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+    - byteverse-network
+    extra_hosts:
+    - host.docker.internal:host-gateway
+  products-service:
+    build: ./services/products-service
+    container_name: products-service
+    restart: unless-stopped
+    ports:
+    - 3002:3002
+    environment:
+    - MYSQL_HOST=${MYSQL_HOST:-host.docker.internal}
+    - MYSQL_PORT=3306
+    - MYSQL_USER=${MYSQL_USER:-root}
+    - MYSQL_PASSWORD=${MYSQL_PASSWORD:-250520}
+    - MYSQL_DATABASE=${MYSQL_DATABASE:-byteverse_db}
+    - RABBITMQ_URL=amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+    - byteverse-network
+    extra_hosts:
+    - host.docker.internal:host-gateway
+  orders-service:
+    build: ./services/orders-service
+    container_name: orders-service
+    restart: unless-stopped
+    ports:
+    - 3003:3003
+    environment:
+    - NODE_ENV=production
+    - MYSQL_HOST=${MYSQL_HOST:-host.docker.internal}
+    - MYSQL_PORT=3306
+    - MYSQL_USER=${MYSQL_USER:-root}
+    - MYSQL_PASSWORD=${MYSQL_PASSWORD:-250520}
+    - MYSQL_DATABASE=${MYSQL_DATABASE:-byteverse_db}
+    - RABBITMQ_URL=amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+    - byteverse-network
+    extra_hosts:
+    - host.docker.internal:host-gateway
+  notifications-service:
+    build: ./services/notifications-service
+    container_name: notifications-service
+    restart: unless-stopped
+    ports:
+    - 3005:3005
+    environment:
+    - RABBITMQ_URL=amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+    - byteverse-network
+  analytics-service:
+    build: ./services/analytics-service
+    container_name: analytics-service
+    restart: unless-stopped
+    ports:
+    - 3006:3006
+    environment:
+    - NODE_ENV=production
+    - MYSQL_HOST=${MYSQL_HOST:-host.docker.internal}
+    - MYSQL_PORT=3306
+    - MYSQL_USER=${MYSQL_USER:-root}
+    - MYSQL_PASSWORD=${MYSQL_PASSWORD:-250520}
+    - MYSQL_DATABASE=${MYSQL_DATABASE:-byteverse_db}
+    - RABBITMQ_URL=amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+    - byteverse-network
+    extra_hosts:
+    - host.docker.internal:host-gateway
+  inventory-service:
+    build: ./services/inventory-service
+    container_name: inventory-service
+    restart: unless-stopped
+    ports:
+    - 3007:3007
+    environment:
+    - NODE_ENV=production
+    - MYSQL_HOST=${MYSQL_HOST:-host.docker.internal}
+    - MYSQL_PORT=3306
+    - MYSQL_USER=${MYSQL_USER:-root}
+    - MYSQL_PASSWORD=${MYSQL_PASSWORD:-250520}
+    - MYSQL_DATABASE=${MYSQL_DATABASE:-byteverse_db}
+    - RABBITMQ_URL=amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+    - byteverse-network
+    extra_hosts:
+    - host.docker.internal:host-gateway
+  payment-service:
+    build: ./services/payment-service
+    container_name: payment-service
+    restart: unless-stopped
+    ports:
+    - 3008:3008
+    environment:
+    - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-}
+    - PAYMENT_ACADEMIC_MODE=${PAYMENT_ACADEMIC_MODE:-true}
+    - MERCADOPAGO_ACCESS_TOKEN=${MERCADOPAGO_ACCESS_TOKEN:-}
+    - MERCADOPAGO_PUBLIC_KEY=${MERCADOPAGO_PUBLIC_KEY:-}
+    - YAPE_MERCHANT_PHONE=${YAPE_MERCHANT_PHONE:-999999999}
+    - YAPE_MERCHANT_QR_URL=${YAPE_MERCHANT_QR_URL:-}
+    - RABBITMQ_URL=amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+    - byteverse-network
+  shipping-service:
+    build: ./services/shipping-service
+    container_name: shipping-service
+    restart: unless-stopped
+    ports:
+    - 3009:3009
+    environment:
+    - NODE_ENV=production
+    - MYSQL_HOST=${MYSQL_HOST:-host.docker.internal}
+    - MYSQL_PORT=3306
+    - MYSQL_USER=${MYSQL_USER:-root}
+    - MYSQL_PASSWORD=${MYSQL_PASSWORD:-250520}
+    - MYSQL_DATABASE=${MYSQL_DATABASE:-byteverse_db}
+    - RABBITMQ_URL=amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+    - byteverse-network
+    extra_hosts:
+    - host.docker.internal:host-gateway
+  review-service:
+    build: ./services/review-service
+    container_name: review-service
+    restart: unless-stopped
+    ports:
+    - 3010:3010
+    environment:
+    - NODE_ENV=production
+    - MYSQL_HOST=${MYSQL_HOST:-host.docker.internal}
+    - MYSQL_PORT=3306
+    - MYSQL_USER=${MYSQL_USER:-root}
+    - MYSQL_PASSWORD=${MYSQL_PASSWORD:-250520}
+    - MYSQL_DATABASE=${MYSQL_DATABASE:-byteverse_db}
+    - RABBITMQ_URL=amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+    - byteverse-network
+    extra_hosts:
+    - host.docker.internal:host-gateway
+  wishlist-service:
+    build: ./services/wishlist-service
+    container_name: wishlist-service
+    restart: unless-stopped
+    ports:
+    - 3011:3011
+    environment:
+    - NODE_ENV=production
+    - MYSQL_HOST=${MYSQL_HOST:-host.docker.internal}
+    - MYSQL_PORT=3306
+    - MYSQL_USER=${MYSQL_USER:-root}
+    - MYSQL_PASSWORD=${MYSQL_PASSWORD:-250520}
+    - MYSQL_DATABASE=${MYSQL_DATABASE:-byteverse_db}
+    networks:
+    - byteverse-network
+    extra_hosts:
+    - host.docker.internal:host-gateway
+  coupon-service:
+    build: ./services/coupon-service
+    container_name: coupon-service
+    restart: unless-stopped
+    ports:
+    - 3012:3012
+    environment:
+    - NODE_ENV=production
+    - MYSQL_HOST=${MYSQL_HOST:-host.docker.internal}
+    - MYSQL_PORT=3306
+    - MYSQL_USER=${MYSQL_USER:-root}
+    - MYSQL_PASSWORD=${MYSQL_PASSWORD:-250520}
+    - MYSQL_DATABASE=${MYSQL_DATABASE:-byteverse_db}
+    healthcheck:
+      test:
+      - CMD
+      - node
+      - -e
+      - fetch('http://localhost:3012/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 20s
+    networks:
+    - byteverse-network
+    extra_hosts:
+    - host.docker.internal:host-gateway
+  audit-service:
+    build: ./services/audit-service
+    container_name: audit-service
+    restart: unless-stopped
+    ports:
+    - 3013:3013
+    environment:
+    - NODE_ENV=production
+    - MYSQL_HOST=${MYSQL_HOST:-host.docker.internal}
+    - MYSQL_PORT=3306
+    - MYSQL_USER=${MYSQL_USER:-root}
+    - MYSQL_PASSWORD=${MYSQL_PASSWORD:-250520}
+    - MYSQL_DATABASE=${MYSQL_DATABASE:-byteverse_db}
+    - RABBITMQ_URL=amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+    - byteverse-network
+    extra_hosts:
+    - host.docker.internal:host-gateway
+  categories-service:
+    build: ./services/categories-service
+    container_name: categories-service
+    restart: unless-stopped
+    ports:
+    - 3014:3014
+    environment:
+    - NODE_ENV=production
+    - MYSQL_HOST=${MYSQL_HOST:-host.docker.internal}
+    - MYSQL_PORT=3306
+    - MYSQL_USER=${MYSQL_USER:-root}
+    - MYSQL_PASSWORD=${MYSQL_PASSWORD:-250520}
+    - MYSQL_DATABASE=${MYSQL_DATABASE:-byteverse_db}
+    networks:
+    - byteverse-network
+    extra_hosts:
+    - host.docker.internal:host-gateway
+  vendor-cart-service:
+    build: ./services/vendor-cart-service
+    container_name: vendor-cart-service
+    restart: unless-stopped
+    ports:
+    - 3015:3015
+    environment:
+    - NODE_ENV=production
+    - MYSQL_HOST=${MYSQL_HOST:-host.docker.internal}
+    - MYSQL_PORT=3306
+    - MYSQL_USER=${MYSQL_USER:-root}
+    - MYSQL_PASSWORD=${MYSQL_PASSWORD:-250520}
+    - MYSQL_DATABASE=${MYSQL_DATABASE:-byteverse_db}
+    networks:
+    - byteverse-network
+    extra_hosts:
+    - host.docker.internal:host-gateway
+networks:
+  byteverse-network:
+    driver: bridge
+
+volumes:
+  api_gateway_uploads:
