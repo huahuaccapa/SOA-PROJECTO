@@ -143,9 +143,3 @@ Contraseña inicial: `123456`
 - Script de inicialización MySQL: `backend/mysql-init.sql`
 - Orquestación local: `backend/docker-compose.yml`
 
-## Contacto
-Si necesitas ayuda, abre un issue en este repositorio describiendo el problema o la mejora que propones.
-
----
-
-(Archivo generado y adaptado a partir de la estructura y documentos existentes en el repositorio.)
